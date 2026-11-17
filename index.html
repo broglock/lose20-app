@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preload" href="fonts/caveat-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/patrick-hand-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=1.3.1">
 </head>
 <body>
 <header class="top">
@@ -245,7 +245,7 @@
       <h3>Data</h3>
       <div class="inline wrap"><button id="saveKeys" class="primary">Save keys and sync</button><button id="exportBtn">Export</button><label class="btn">Import<input id="importInput" type="file" accept=".json" hidden></label></div>
       <p class="hint">Keys stay on this device. They are never written to the sync repo.</p>
-      <p class="hint"><span id="appVersion">Version unknown</span>. Updates install automatically.</p>
+      <p class="hint"><span id="appVersion">Version unknown</span>. Updates install automatically. <button class="small" id="updateBtn">Update now</button></p>
     </div>
   </section>
 </main>
@@ -269,14 +269,15 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="coach.js"></script>
-<script src="gamify.js"></script>
-<script src="tips.js"></script>
-<script src="avatar.js"></script>
-<script src="charts.js"></script>
-<script src="fx.js"></script>
-<script src="services.js"></script>
-<script src="photomaya.js"></script>
-<script src="app.js"></script>
+<script src="version.js?v=1.3.1"></script>
+<script src="coach.js?v=1.3.1"></script>
+<script src="gamify.js?v=1.3.1"></script>
+<script src="tips.js?v=1.3.1"></script>
+<script src="avatar.js?v=1.3.1"></script>
+<script src="charts.js?v=1.3.1"></script>
+<script src="fx.js?v=1.3.1"></script>
+<script src="services.js?v=1.3.1"></script>
+<script src="photomaya.js?v=1.3.1"></script>
+<script src="app.js?v=1.3.1"></script>
 </body>
 </html>

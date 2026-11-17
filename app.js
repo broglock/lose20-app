@@ -559,30 +559,51 @@
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
 
   // ---------- auto-update ----------
-  let loadedVersion = null, pendingUpdate = null;
+  // The running code knows its own version (version.js, written by release.py).
+  // If the server's version.json differs, reload with fresh files.
+  const CODE_VERSION = self.APP_VERSION || '0';
+  let pendingUpdate = null;
+  $('appVersion').textContent = 'Version ' + CODE_VERSION;
   function safeToReload() {
     return !pendingMeal && !rec && !$('chatInput').value && !$('wInput').value && $('planModal').hidden &&
-      !document.querySelector('#tab-settings.active') && !document.querySelector('.msg.typing');
+      !document.querySelector('.msg.typing');
   }
-  async function applyUpdate(v) {
-    if (!safeToReload()) { pendingUpdate = v; return; }
-    try { const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) await reg.update(); } catch (e) {}
+  async function hardReload(v) {
     sessionStorage.setItem('lose20.updatedTo', v);
-    location.reload();
+    sessionStorage.setItem('lose20.reloadAt', Date.now());
+    try { const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) await reg.update(); } catch (e) {}
+    try { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); } catch (e) {}
+    location.replace(location.pathname + '?v=' + encodeURIComponent(v) + (DESK ? '&desk=1' : '') + location.hash);
   }
-  async function checkUpdate() {
+  async function applyUpdate(v, force) {
+    // don't loop if the server is still handing out the old files: one retry per 2 minutes
+    const last = +sessionStorage.getItem('lose20.reloadAt') || 0;
+    if (!force && Date.now() - last < 120000) return;
+    if (!force && !safeToReload()) { pendingUpdate = v; return; }
+    hardReload(v);
+  }
+  async function checkUpdate(force) {
     try {
       const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
-      if (!r.ok) return;
+      if (!r.ok) return null;
       const v = (await r.json()).version;
-      if (!loadedVersion) { loadedVersion = v; $('appVersion').textContent = 'Version ' + v; return; }
-      if (v !== loadedVersion) applyUpdate(v);
-    } catch (e) {}
+      if (v !== CODE_VERSION) applyUpdate(v, force); else pendingUpdate = null;
+      return v;
+    } catch (e) { return null; }
   }
+  $('updateBtn').onclick = async () => {
+    $('updateBtn').disabled = true;
+    const v = await checkUpdate(true);
+    if (v === CODE_VERSION) { toast('You have the latest version (' + v + ')'); $('updateBtn').disabled = false; }
+    else if (!v) { toast('Could not reach the update server'); $('updateBtn').disabled = false; }
+  };
   const updated = sessionStorage.getItem('lose20.updatedTo');
-  if (updated) { sessionStorage.removeItem('lose20.updatedTo'); setTimeout(() => toast('Updated to version ' + updated), 800); }
+  if (updated) {
+    sessionStorage.removeItem('lose20.updatedTo');
+    setTimeout(() => toast(updated === CODE_VERSION ? 'Updated to version ' + updated : 'Update downloading, try again in a minute'), 800);
+  }
   checkUpdate();
-  setInterval(() => pendingUpdate ? applyUpdate(pendingUpdate) : checkUpdate(), 30 * 60 * 1000);
+  setInterval(() => pendingUpdate ? applyUpdate(pendingUpdate) : checkUpdate(), 15 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pendingUpdate ? applyUpdate(pendingUpdate) : checkUpdate(); });
   document.addEventListener('click', () => { if (pendingUpdate) setTimeout(() => applyUpdate(pendingUpdate), 1500); });
 })();
