@@ -7,17 +7,18 @@
   const MEAL_PROMPT = `You are a nutrition analyst. Look at this meal photo{{NOTE}} and estimate what is on the plate and the portion sizes.
 Return ONLY a JSON object, no other text, with these fields:
 {"name": short meal name,
- "items": [{"food": string, "portion": string, "kcal": number}],
+ "items": [{"food": string, "portion": string, "kcal": number, "color": "green" | "yellow" | "red"}],
  "kcal": total calories (number),
  "protein_g": number, "carbs_g": number, "fat_g": number, "fiber_g": number,
  "health_score": 1-10 for someone aged 60 losing weight while lifting weights (10 = lean protein, vegetables, whole foods, sensible portion),
  "verdict": one short sentence on how this meal fits a weight-loss day,
  "swap_tip": one specific, practical change that would make this meal better for losing weight,
+ "light": "green" | "yellow" | "red" for the whole meal: green = low calorie density, lean protein, vegetables, sensible portion; yellow = okay in moderation; red = calorie dense, fried, sugary, or a portion over about 900 kcal,
  "confidence": "low" | "medium" | "high"}
 If oils, sauces or dressings are likely, include them as items. Round calories to the nearest 10.`;
 
   const TEXT_PROMPT = `You are a nutrition analyst. Estimate the nutrition for this meal description: "{{TEXT}}".
-Return ONLY a JSON object with the same fields as: {"name","items":[{"food","portion","kcal"}],"kcal","protein_g","carbs_g","fat_g","fiber_g","health_score" (1-10 for a 60-year-old losing weight while lifting),"verdict","swap_tip","confidence"}.`;
+Return ONLY a JSON object with the same fields as: {"name","items":[{"food","portion","kcal","color":"green|yellow|red by calorie density"}],"kcal","protein_g","carbs_g","fat_g","fiber_g","health_score" (1-10 for a 60-year-old losing weight while lifting),"verdict","swap_tip","light":"green|yellow|red for the whole meal","confidence"}.`;
 
   function extractJson(text) {
     const a = text.indexOf('{'), b = text.lastIndexOf('}');
@@ -79,7 +80,7 @@ ${summary}`;
   let audioEl = null;
   function esc(s) { return s.replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c])); }
 
-  async function speak(settings, text, onStart, onEnd) {
+  async function speak(settings, text, onStart, onEnd, onAudio) {
     if (!settings.voiceOn) { onEnd && onEnd(); return; }
     stopSpeaking();
     if (settings.azureKey && settings.azureRegion) {
@@ -94,6 +95,7 @@ ${summary}`;
         if (!r.ok) throw new Error('Azure speech error ' + r.status);
         const blob = await r.blob();
         audioEl = new Audio(URL.createObjectURL(blob));
+        if (onAudio) onAudio(audioEl);
         audioEl.onplay = () => onStart && onStart();
         audioEl.onended = audioEl.onerror = () => onEnd && onEnd();
         await audioEl.play();

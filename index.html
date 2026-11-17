@@ -3,138 +3,203 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b3b47">
+<meta name="theme-color" content="#f7f0e1">
 <title>Lose20</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preload" href="fonts/caveat-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/patrick-hand-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <header class="top">
   <div class="brand">Lose<b>20</b></div>
-  <button id="syncBtn" class="ghost small" title="Sync now">⟳ <span id="syncState">Not synced</span></button>
+  <span class="chip lvl" id="lvlChip" title="Level">Lv 1</span>
+  <span class="chip" id="ptsChip" title="Points today">⭐ 0</span>
+  <button class="icon-btn" id="syncBtn" title="Sync now"><span class="sync-dot" id="syncDot"></span></button>
+  <button class="icon-btn" id="gearBtn" title="Settings">⚙️</button>
 </header>
 
 <main>
-  <!-- TODAY -->
   <section id="tab-today" class="tab active">
-    <div class="hero">
-      <div id="avatarToday" class="avatar" title="Tap to hear Maya"></div>
-      <div class="bubble"><p id="bubbleText">Hi.</p><button id="hearTip" class="ghost small">🔊 Hear it</button></div>
+    <div class="panel mint hero">
+      <div id="mayaHero" class="maya-box" title="Tap Maya"></div>
+      <div class="bubble">
+        <p id="bubble">…</p>
+        <div class="acts"><button class="small" id="hearBtn">🔊 Hear Maya</button><button class="small" id="tipBtn">Another tip</button></div>
+      </div>
+    </div>
+    <p class="tap-hint" id="tapHint">Tap Maya to hear her</p>
+
+    <div class="panel peach" id="comeback" hidden>
+      <span class="doodle">💛</span>
+      <h3>Welcome back</h3>
+      <p id="comebackText"></p>
+      <button class="primary" data-go="log">📸 Log my next meal</button>
     </div>
 
-    <div class="card stats">
-      <div><span class="label">Trend weight</span><b id="sWeight">–</b><small>lb</small></div>
-      <div><span class="label">Lost</span><b id="sLost">–</b><small>of <span id="sGoalLb">20</span> lb</small></div>
-      <div><span class="label">Goal by</span><b id="sEta">–</b><small id="sEtaBasis"></small></div>
-      <div class="progress"><div id="sBar"></div></div>
+    <div class="panel butter missions">
+      <span class="doodle">🎯</span>
+      <h3>Today's missions</h3>
+      <ul id="missions"></ul>
+      <div class="mission-foot" id="missionFoot"></div>
     </div>
 
-    <div class="card fix" id="fixCard" hidden>
-      <span class="label">Fix this first</span>
-      <h3 id="fixTitle"></h3><p id="fixDetail"></p>
-    </div>
-
-    <div class="card today-grid">
-      <div id="ring"></div>
-      <div class="macros">
-        <div class="macro"><span>Protein</span><div class="mbar"><div id="mProt"></div></div><small id="tProt"></small></div>
-        <div class="macro"><span>Fiber</span><div class="mbar"><div id="mFib"></div></div><small id="tFib"></small></div>
-        <div class="macro"><span>Health</span><div class="mbar"><div id="mScore"></div></div><small id="tScore"></small></div>
+    <div class="row2">
+      <div class="panel sky">
+        <h3>Points bank</h3>
+        <div class="bank-num" id="bankNum">200</div>
+        <div class="bank-bar"><i id="bankBar"></i></div>
+        <small id="bankNote"></small>
+      </div>
+      <div class="panel lilac">
+        <h3>Streaks</h3>
+        <div id="streaks"></div>
       </div>
     </div>
 
-    <div class="card row-card">
+    <div class="panel fuel">
+      <div id="ring"></div>
+      <div>
+        <div class="macro"><span>Protein</span><div class="mbar"><i id="mProt"></i></div><small id="tProt"></small></div>
+        <div class="macro"><span>Fiber</span><div class="mbar"><i id="mFib"></i></div><small id="tFib"></small></div>
+      </div>
+      <div class="mix">
+        <span class="label">Today's plate colours</span>
+        <div class="mixbar" id="mixbar"></div>
+        <div class="mixleg"><span><span class="dot green"></span> green</span><span><span class="dot yellow"></span> yellow</span><span><span class="dot red"></span> red</span></div>
+      </div>
+    </div>
+
+    <div class="panel row-card">
       <div>
         <span class="label">Weigh-in</span>
         <div class="inline"><input id="wInput" type="number" step="0.1" inputmode="decimal" placeholder="lb"><button id="wSave">Save</button></div>
         <small id="wHint">Morning, after the bathroom, before food.</small>
       </div>
       <div>
-        <span class="label" id="gymLabel">Gym</span>
+        <span class="label" id="gymLabel">Workout</span>
         <label class="check"><input type="checkbox" id="gymDone"> <span id="gymText">Weights + 5k done</span></label>
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-head"><span class="label">Today's meals</span><button class="small" data-go="log">+ Add meal</button></div>
+    <div class="panel mint">
+      <span class="doodle">🍳</span>
+      <h3 id="ideaTitle">Idea for breakfast</h3>
+      <p id="idea" style="margin:0"></p>
+    </div>
+
+    <div class="panel plans">
+      <span class="doodle">🧠</span>
+      <h3>My if-then plans</h3>
+      <ul id="plans"></ul>
+      <button class="small" id="pickPlans">+ Pick plans with Maya</button>
+    </div>
+
+    <div class="panel">
+      <div class="inline" style="justify-content:space-between"><h3>Today's plate</h3><button class="small" data-go="log">+ Add</button></div>
       <ul id="mealList" class="meals"></ul>
     </div>
   </section>
 
-  <!-- LOG MEAL -->
   <section id="tab-log" class="tab">
-    <div class="card">
-      <h2>Log a meal</h2>
+    <div class="panel">
+      <h2>Snap your meal</h2>
       <div class="photo-btns">
-        <label class="big-btn">📷 Take photo<input id="camInput" type="file" accept="image/*" capture="environment" hidden></label>
-        <label class="big-btn alt">🖼 From gallery<input id="galInput" type="file" accept="image/*" hidden></label>
+        <label class="big-btn">📷 Camera<input id="camInput" type="file" accept="image/*" capture="environment" hidden></label>
+        <label class="big-btn alt">🖼 Gallery<input id="galInput" type="file" accept="image/*" hidden></label>
       </div>
-      <img id="preview" class="preview" hidden alt="Meal photo">
-      <input id="mealNote" placeholder="Optional note: e.g. large portion, ranch dressing">
-      <button id="analyzeBtn" class="primary" hidden>Analyze with Claude</button>
+      <div class="shot" id="shot" hidden><img id="preview" alt="Meal photo"><span class="scan-label">Maya is looking…</span></div>
+      <input id="mealNote" placeholder="Note for Maya: large portion, ranch dressing…">
+      <button id="analyzeBtn" class="primary" hidden>Analyze again</button>
       <details>
-        <summary>No photo? Describe it instead</summary>
+        <summary>No photo? Describe it</summary>
         <textarea id="mealText" rows="3" placeholder="2 eggs, toast with butter, black coffee"></textarea>
-        <button id="analyzeTextBtn">Estimate from description</button>
+        <button id="analyzeTextBtn">Estimate it</button>
       </details>
-      <p id="analyzeStatus" class="status"></p>
+      <p id="analyzeStatus" class="hint"></p>
     </div>
 
-    <div class="card" id="resultCard" hidden>
-      <div class="result-head"><input id="rName" class="title-input"><span id="rScoreBadge" class="badge"></span></div>
+    <div class="panel result" id="resultCard" hidden>
+      <div class="verdict-head">
+        <div id="mayaResult" class="maya-box small"></div>
+        <div>
+          <span class="light-badge" id="lightBadge">GREEN</span>
+          <input id="rName" class="title-input">
+        </div>
+      </div>
       <p id="rVerdict" class="verdict"></p>
       <p id="rSwap" class="swap"></p>
       <ul id="rItems" class="items"></ul>
       <div class="grid4">
         <label>kcal<input id="rKcal" type="number"></label>
-        <label>Protein g<input id="rProt" type="number"></label>
-        <label>Carbs g<input id="rCarb" type="number"></label>
-        <label>Fat g<input id="rFat" type="number"></label>
-        <label>Fiber g<input id="rFib" type="number"></label>
-        <label>Score /10<input id="rScore" type="number" min="1" max="10"></label>
+        <label>Protein<input id="rProt" type="number"></label>
+        <label>Carbs<input id="rCarb" type="number"></label>
+        <label>Fat<input id="rFat" type="number"></label>
+        <label>Fiber<input id="rFib" type="number"></label>
+        <label>Score<input id="rScore" type="number" min="1" max="10"></label>
         <label>Date<input id="rDate" type="date"></label>
         <label>Time<input id="rTime" type="time"></label>
       </div>
-      <p class="hint">Photo estimates are rough. Adjust portions you know better.</p>
+      <p class="hint">Photo estimates are rough. Fix anything you know better.</p>
       <button id="saveMeal" class="primary">Save meal</button>
     </div>
   </section>
 
-  <!-- PROGRESS -->
-  <section id="tab-progress" class="tab">
-    <div class="card"><h3>Weight</h3><p class="sub">Dots are scale readings. The line is the smoothed trend, which is what matters.</p><div id="chWeight" class="chart-box"></div></div>
-    <div class="grid2">
-      <div class="card"><h3>Going right</h3><ul id="winsList" class="verdicts good"></ul></div>
-      <div class="card"><h3>Going wrong</h3><ul id="probList" class="verdicts bad"></ul></div>
+  <section id="tab-diary" class="tab">
+    <div class="panel butter" id="reportCard">
+      <h3>Weekly report card</h3>
+      <div id="reportBody"><p class="hint">Maya grades your last 7 days and tells you what to fix.</p></div>
+      <button class="small" id="reportBtn">Get my report card</button>
     </div>
-    <div class="card"><h3>Calories, last 14 days</h3><div id="chKcal" class="chart-box"></div></div>
-    <div class="card"><h3>Protein, last 14 days</h3><p class="sub">Protein protects muscle while you lose fat.</p><div id="chProt" class="chart-box"></div></div>
-    <div class="card"><h3>Consistency, last 28 days</h3><p class="sub">People who log 6 to 7 days a week lose the most.</p><div id="chCons" class="chart-box"></div></div>
+    <div id="diaryFeed"></div>
   </section>
 
-  <!-- COACH -->
-  <section id="tab-coach" class="tab">
-    <div class="coach-top">
-      <div id="avatarCoach" class="avatar big"></div>
+  <section id="tab-progress" class="tab">
+    <div class="panel mint">
+      <h3>Progress the scale can't show yet</h3>
+      <div class="lead">
+        <div><b id="leadFat7">0</b><small>lb fat burned this week*</small></div>
+        <div><b id="leadFatAll">0</b><small>lb fat burned since start*</small></div>
+        <div><b id="leadXp">0</b><small>points earned</small></div>
+      </div>
+      <p class="hint" style="margin-top:6px">*Estimated from your logged calories on fully logged days. The scale catches up over 2 to 4 weeks.</p>
+    </div>
+    <div class="panel"><h3>Weight</h3><p class="sub">Dots are scale readings. The line is the smoothed trend.</p><div id="chWeight" class="chart-box"></div></div>
+    <div class="panel lilac"><h3>Badges</h3><div class="badges" id="badges"></div></div>
+    <div class="row2">
+      <div class="panel"><h3>Going right</h3><ul id="winsList" class="verdicts good"></ul></div>
+      <div class="panel"><h3>Going wrong</h3><ul id="probList" class="verdicts bad"></ul></div>
+    </div>
+    <div class="panel"><h3>Calories, 14 days</h3><div id="chKcal" class="chart-box"></div></div>
+    <div class="panel"><h3>Protein, 14 days</h3><div id="chProt" class="chart-box"></div></div>
+    <div class="panel"><h3>Consistency, 28 days</h3><p class="sub">Logging 6 to 7 days a week is what predicts results.</p><div id="chCons" class="chart-box"></div></div>
+  </section>
+
+  <section id="tab-maya" class="tab">
+    <div>
+      <div class="panel mint"><div id="mayaCoach" class="maya-box big"></div></div>
       <div class="coach-actions">
-        <button id="pepBtn">Pep talk</button>
-        <button id="reviewBtn">Review my day</button>
-        <label class="check"><input type="checkbox" id="voiceOn"> Voice</label>
+        <button id="pepBtn">💪 Pep talk</button>
+        <button id="reviewBtn">📋 Review my day</button>
+        <button id="hungryBtn">🍽 I'm hungry, what now?</button>
+        <label class="check"><input type="checkbox" id="voiceOn"> Maya speaks out loud</label>
+      </div>
+      <div id="deskSummary"></div>
+    </div>
+    <div>
+      <div id="chat" class="chat"></div>
+      <div class="chat-input">
+        <button id="micBtn" class="round" title="Talk">🎤</button>
+        <input id="chatInput" placeholder="Talk to Maya…">
+        <button id="sendBtn" class="round primary" title="Send">➤</button>
       </div>
     </div>
-    <div id="chat" class="chat"></div>
-    <div class="chat-input">
-      <button id="micBtn" class="round" title="Talk">🎤</button>
-      <input id="chatInput" placeholder="Ask Maya anything…">
-      <button id="sendBtn" class="round primary" title="Send">➤</button>
-    </div>
   </section>
 
-  <!-- SETTINGS -->
   <section id="tab-settings" class="tab">
-    <div class="card">
+    <div class="panel">
       <h3>Your profile</h3>
       <div class="grid2f">
         <label>Name<input id="pName"></label>
@@ -151,39 +216,35 @@
       <p id="pTargets" class="hint"></p>
       <button id="saveProfile" class="primary">Save profile</button>
     </div>
-
-    <div class="card">
-      <h3>Claude (meal analysis and coach)</h3>
-      <label>API key<input id="sAnthKey" type="password" placeholder="sk-ant-…" autocomplete="off"></label>
+    <div class="panel">
+      <h3>Claude</h3>
+      <label>API key<input id="sAnthKey" type="password" autocomplete="off"></label>
       <label>Model<input id="sModel" placeholder="claude-sonnet-5-5"></label>
     </div>
-
-    <div class="card">
+    <div class="panel">
       <h3>Sync (private GitHub repo)</h3>
-      <label>Repo<input id="sRepo" placeholder="your-user/lose20-data"></label>
-      <label>Fine-grained token<input id="sGhToken" type="password" placeholder="github_pat_…" autocomplete="off"></label>
+      <label>Repo<input id="sRepo" placeholder="user/lose20-data"></label>
+      <label>Token<input id="sGhToken" type="password" autocomplete="off"></label>
     </div>
-
-    <div class="card">
-      <h3>Maya's voice (Azure AI Speech)</h3>
-      <label>Speech key<input id="sAzKey" type="password" autocomplete="off"></label>
-      <label>Region<input id="sAzRegion" placeholder="canadacentral"></label>
+    <div class="panel">
+      <h3>Maya's voice</h3>
+      <label>Azure Speech key<input id="sAzKey" type="password" autocomplete="off"></label>
+      <label>Region<input id="sAzRegion" placeholder="eastus"></label>
       <label>Voice<select id="sVoice">
-        <option value="en-US-AvaMultilingualNeural">Ava (US, warm)</option>
+        <option value="en-US-AvaMultilingualNeural">Ava (warm)</option>
         <option value="en-US-Ava:DragonHDLatestNeural">Ava HD (most natural)</option>
-        <option value="en-US-EmmaMultilingualNeural">Emma (US, bright)</option>
-        <option value="en-US-JennyNeural">Jenny (US, friendly)</option>
-        <option value="en-US-AriaNeural">Aria (US, confident)</option>
+        <option value="en-US-EmmaMultilingualNeural">Emma (bright)</option>
+        <option value="en-US-JennyNeural">Jenny (friendly)</option>
+        <option value="en-US-AriaNeural">Aria (confident)</option>
         <option value="en-CA-ClaraNeural">Clara (Canadian)</option>
         <option value="en-GB-SoniaNeural">Sonia (British)</option>
       </select></label>
       <button id="testVoice">Test voice</button>
     </div>
-
-    <div class="card">
+    <div class="panel">
       <h3>Data</h3>
-      <div class="inline wrap"><button id="saveKeys" class="primary">Save keys and sync</button><button id="exportBtn">Export JSON</button><label class="btn">Import JSON<input id="importInput" type="file" accept=".json" hidden></label></div>
-      <p class="hint">Keys stay in this browser only. They are never written to the sync repo.</p>
+      <div class="inline wrap"><button id="saveKeys" class="primary">Save keys and sync</button><button id="exportBtn">Export</button><label class="btn">Import<input id="importInput" type="file" accept=".json" hidden></label></div>
+      <p class="hint">Keys stay on this device. They are never written to the sync repo.</p>
       <p class="hint"><span id="appVersion">Version unknown</span>. Updates install automatically.</p>
     </div>
   </section>
@@ -191,17 +252,29 @@
 
 <nav class="tabs">
   <button data-go="today" class="active">🏠<span>Today</span></button>
-  <button data-go="log">📷<span>Log</span></button>
+  <button data-go="log">📸<span>Snap</span></button>
+  <button data-go="diary">📔<span>Diary</span></button>
   <button data-go="progress">📈<span>Progress</span></button>
-  <button data-go="coach">💬<span>Maya</span></button>
-  <button data-go="settings">⚙️<span>Settings</span></button>
+  <button data-go="maya">💬<span>Maya</span></button>
 </nav>
+
+<div class="modal" id="planModal" hidden>
+  <div class="panel butter">
+    <h3>If-then plans</h3>
+    <p class="sub">Specific "if this happens, then I do that" plans are one of the best-tested tools for changing eating habits. Maya picked these for your weak spots. Choose 1 to 3.</p>
+    <div id="planChoices"></div>
+    <div class="inline" style="margin-top:10px"><button class="primary" id="savePlans">Save plans</button><button id="closePlans">Cancel</button></div>
+  </div>
+</div>
 
 <div id="toast" class="toast"></div>
 
 <script src="coach.js"></script>
+<script src="gamify.js"></script>
+<script src="tips.js"></script>
 <script src="avatar.js"></script>
 <script src="charts.js"></script>
+<script src="fx.js"></script>
 <script src="services.js"></script>
 <script src="app.js"></script>
 </body>

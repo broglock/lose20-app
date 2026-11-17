@@ -26,7 +26,10 @@
       },
       weights: [],
       meals: [],
-      workouts: []
+      workouts: [],
+      plans: [],        // if-then plans the user picked
+      planChecks: [],   // daily kept/missed for each plan
+      reports: []       // weekly report cards
     };
   }
 
@@ -348,13 +351,21 @@
   function mergeState(local, remote) {
     if (!remote) return local;
     if (!local) return remote;
-    return {
-      version: 1,
-      profile: (remote.profile.updatedAt || 0) > (local.profile.updatedAt || 0) ? remote.profile : local.profile,
-      weights: mergeArrays(local.weights, remote.weights),
-      meals: mergeArrays(local.meals, remote.meals),
-      workouts: mergeArrays(local.workouts, remote.workouts)
-    };
+    const out = { version: 1, profile: (remote.profile.updatedAt || 0) > (local.profile.updatedAt || 0) ? remote.profile : local.profile };
+    // Every array field merges record by record, so new record types sync without code changes.
+    new Set(Object.keys(local).concat(Object.keys(remote))).forEach(k => {
+      if (Array.isArray(local[k]) || Array.isArray(remote[k])) out[k] = mergeArrays(local[k], remote[k]);
+    });
+    return out;
+  }
+
+  // Traffic light for a meal: Claude's call if present, otherwise from score and size.
+  function mealLight(m, kcalTarget) {
+    let light = m.light || ((m.score || 5) >= 7 ? 'green' : (m.score || 5) >= 5 ? 'yellow' : 'red');
+    const share = kcalTarget ? (m.kcal || 0) / kcalTarget : 0;
+    if (share > 0.7) light = 'red';
+    else if (share > 0.5 && light === 'green') light = 'yellow';
+    return light;
   }
 
   // Short plain-text summary for Claude prompts (coach chat, nag messages).
@@ -373,6 +384,6 @@
   }
 
   const api = { defaultState, targets, weightSeries, currentWeight, trendRate, dayTotals, analyze, pickTip, TIPS,
-    mergeState, mergeArrays, summaryText, ymd, addDays, lastNDays, daysBetween, isWeekend, live };
+    mergeState, mergeArrays, mealLight, summaryText, ymd, addDays, lastNDays, daysBetween, isWeekend, live };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Coach = api;
 })(typeof self !== 'undefined' ? self : this);

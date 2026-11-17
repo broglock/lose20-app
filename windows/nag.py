@@ -203,6 +203,8 @@ def claude_message(cfg, s, slot):
               "Be encouraging but direct and a little playful. Point out the most important thing going wrong and one concrete fix. "
               "Evidence you rely on: log every meal, weigh daily and watch the trend, same eating on weekends, breakfast, "
               "high protein to keep muscle, vegetables for volume, few liquid calories. No crash dieting. "
+              "Never scold. If he has missed days of logging, be warm, skip the guilt, and ask for one small action right now. "
+              "Ask for only one thing per check-in. "
               "This is spoken aloud: 2 or 3 short sentences, no lists, no emoji, no markdown.")
     user = f"{SLOT_BRIEF[slot]}\n\nHis data:\n{summary_text(s)}"
     body = json.dumps({"model": cfg.get("claude_model", "claude-sonnet-5-5"), "max_tokens": 2000,

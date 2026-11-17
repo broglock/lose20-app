@@ -2,7 +2,7 @@
    colors (good/critical) for on/over target, always paired with a text label. */
 (function (root) {
   'use strict';
-  const C = { blue: '#3987e5', good: '#0ca30c', warn: '#fab219', crit: '#d03b3b', grid: '#3a3a37', ink: '#c3c2b7', ink2: '#8d8c84', surface: '#1a1a19' };
+  const C = { blue: '#2a78d6', good: '#0ca30c', warn: '#fab219', crit: '#d03b3b', grid: '#e3d8c3', ink: '#3b3530', ink2: '#7a6f62', surface: '#fffaf0' };
   const W = 340, H = 180, P = { l: 34, r: 10, t: 12, b: 22 };
 
   const f1 = n => (Math.round(n * 10) / 10).toFixed(1);
@@ -116,11 +116,11 @@
   function ring(el, eaten, target) {
     const r = 52, c = 2 * Math.PI * r, frac = Math.min(1, eaten / target), over = eaten > target;
     el.innerHTML = `<svg viewBox="0 0 130 130" class="ring">
-      <circle cx="65" cy="65" r="${r}" stroke="${C.grid}" stroke-width="11" fill="none"/>
-      <circle cx="65" cy="65" r="${r}" stroke="${over ? C.crit : C.blue}" stroke-width="11" fill="none" stroke-linecap="round"
+      <circle cx="65" cy="65" r="${r}" stroke="#2b2622" stroke-width="15" fill="none"/><circle cx="65" cy="65" r="${r}" stroke="#ffffff" stroke-width="10" fill="none"/>
+      <circle cx="65" cy="65" r="${r}" stroke="${over ? C.crit : C.blue}" stroke-width="10" fill="none" stroke-linecap="round"
         stroke-dasharray="${(frac * c).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 65 65)"/>
-      <text x="65" y="62" text-anchor="middle" fill="#f0efec" font-size="24" font-weight="700">${Math.abs(target - Math.round(eaten))}</text>
-      <text x="65" y="80" text-anchor="middle" fill="${C.ink}" font-size="11">${over ? '✕ kcal over' : 'kcal left'}</text></svg>`;
+      <text x="65" y="64" text-anchor="middle" fill="#2b2622" font-size="30" font-family="Caveat,cursive" font-weight="700">${Math.abs(target - Math.round(eaten))}</text>
+      <text x="65" y="84" text-anchor="middle" fill="${C.ink}" font-size="13">${over ? '✕ kcal over' : 'kcal left'}</text></svg>`;
   }
 
   root.Charts = { weight, bars, consistency, ring, COLORS: C };
