@@ -76,7 +76,7 @@
     Services.speak(settings, text,
       () => { if (!inst[0].svg.classList.contains('lipsync')) inst.forEach(i => i.talk(true)); },
       () => inst.forEach(i => i.talk(false)),
-      audio => Avatar.lipSync(audio, inst));
+      audio => (MayaKind.lipSync || Avatar.lipSync)(audio, inst));
   }
 
   // ---------- sync ----------
