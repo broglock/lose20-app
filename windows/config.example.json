@@ -1,0 +1,11 @@
+{
+  "app_url": "https://YOUR-GITHUB-USER.github.io/lose20-app/index.html",
+  "github_repo": "YOUR-GITHUB-USER/lose20-data",
+  "github_path": "data.json",
+  "github_token": "github_pat_...",
+  "anthropic_key": "sk-ant-...",
+  "claude_model": "claude-sonnet-5-5",
+  "azure_key": "...",
+  "azure_region": "canadacentral",
+  "azure_voice": "en-US-AvaMultilingualNeural"
+}
