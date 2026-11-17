@@ -27,17 +27,20 @@
   function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2800); }
 
   // ---------- Maya instances ----------
+  // Photo Maya (realistic, animated on a canvas). The cartoon is only a fallback if PhotoMaya is missing.
+  const MayaKind = self.PhotoMaya || Avatar;
   const maya = {
-    hero: Avatar.create($('mayaHero'), {}),
-    coach: Avatar.create($('mayaCoach'), {}),
-    result: Avatar.create($('mayaResult'), { backdrop: true })
+    hero: MayaKind.create($('mayaHero'), {}),
+    coach: MayaKind.create($('mayaCoach'), {}),
+    result: MayaKind.create($('mayaResult'), { backdrop: true })
   };
   const allMaya = () => Object.values(maya);
   function mayaMood(m) { allMaya().forEach(i => i.setMood(m)); }
 
   // Live photorealistic avatar (Azure). Cartoon Maya only shows if the live avatar is off or failing.
   let liveBroken = false;
-  const liveMode = () => settings.avatarOn !== false && !!settings.azureKey && !liveBroken && !!self.LiveMaya;
+  const LiveMaya = self.LiveMaya || { speak: async () => false, stop() {}, close() {}, attach() {}, decorate() {}, minutesToday: () => 0 };
+  const liveMode = () => !!self.LiveMaya && settings.avatarOn === true && !!settings.azureKey && !liveBroken;
   const boxes = { today: $('mayaHero'), maya: $('mayaCoach'), log: $('mayaResult') };
   function activeBox() {
     const t = (document.querySelector('.tab.active') || {}).id || 'tab-today';
@@ -459,7 +462,7 @@
   $('voiceOn').onchange = e => { settings.voiceOn = e.target.checked; saveSettings(); if (!settings.voiceOn) { Services.stopSpeaking(); LiveMaya.stop(); } };
 
   // Maya on the Today screen
-  const heroTap = () => { $('tapHint').hidden = true; LiveMaya.attach && liveMode() && LiveMaya.attach(boxes.today); say($('bubble').textContent, { pose: 'wave', bubble: false }); };
+  const heroTap = () => { $('tapHint').hidden = true; say($('bubble').textContent, { pose: 'wave', bubble: false }); };
   $('mayaHero').onclick = heroTap;
   $('hearBtn').onclick = heroTap;
   $('tipBtn').onclick = () => { const t = tipLine(); say(t, { pose: Math.random() < .5 ? 'thumbs' : 'think' }); };
@@ -485,10 +488,7 @@
     $('sAnthKey').value = settings.anthropicKey || ''; $('sModel').value = settings.model || '';
     $('sRepo').value = settings.ghRepo || ''; $('sGhToken').value = settings.ghToken || '';
     $('sAzKey').value = settings.azureKey || ''; $('sAzRegion').value = settings.azureRegion || ''; $('sVoice').value = settings.voice;
-    $('sAvatarOn').checked = settings.avatarOn !== false;
-    $('sAvatar').value = (settings.avatarCharacter || 'meg') + '/' + (settings.avatarStyle || 'casual');
-    $('sAvatarCap').value = settings.avatarCapMin || 10;
-    $('sAvatarUse').textContent = `Live avatar used ${LiveMaya.minutesToday()} of ${settings.avatarCapMin || 10} min today.`;
+
   }
   $('saveProfile').onclick = () => {
     Object.assign(state.profile, {
@@ -502,9 +502,7 @@
     Object.assign(settings, {
       anthropicKey: $('sAnthKey').value.trim(), model: $('sModel').value.trim() || 'claude-sonnet-5-5',
       ghRepo: $('sRepo').value.trim(), ghToken: $('sGhToken').value.trim(),
-      azureKey: $('sAzKey').value.trim(), azureRegion: $('sAzRegion').value.trim(), voice: $('sVoice').value,
-      avatarOn: $('sAvatarOn').checked, avatarCharacter: $('sAvatar').value.split('/')[0], avatarStyle: $('sAvatar').value.split('/')[1],
-      avatarCapMin: Math.max(1, +$('sAvatarCap').value || 10)
+      azureKey: $('sAzKey').value.trim(), azureRegion: $('sAzRegion').value.trim(), voice: $('sVoice').value
     });
     saveSettings(); liveBroken = false; LiveMaya.close(); applyLiveMode();
   }

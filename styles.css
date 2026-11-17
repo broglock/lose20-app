@@ -235,3 +235,10 @@ body.desk .maya-box.big{width:260px;height:347px}
 .live-badge{position:absolute;top:6px;left:6px;font-size:12px;background:var(--crit);color:#fff;border-radius:999px;padding:1px 7px;border:1.5px solid var(--ink)}
 .live-wrap.talking .live-badge{animation:pulse 1s infinite}
 .result .live-box{flex:none}
+
+/* photo Maya sizing */
+.maya-box.pmaya{width:150px;height:210px}
+.hero{grid-template-columns:150px 1fr}
+.maya-box.big.pmaya{width:100%;max-width:330px;height:auto;aspect-ratio:3/4;margin:0 auto}
+.maya-box.small.pmaya{width:96px;height:128px}
+body.desk .maya-box.big.pmaya{max-width:380px}
