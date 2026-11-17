@@ -30,7 +30,7 @@
         <div class="acts"><button class="small" id="hearBtn">🔊 Hear Maya</button><button class="small" id="tipBtn">Another tip</button></div>
       </div>
     </div>
-    <p class="tap-hint" id="tapHint">Tap Maya to hear her</p>
+    <p class="tap-hint" id="tapHint">Tap Maya to talk to her</p>
 
     <div class="panel peach" id="comeback" hidden>
       <span class="doodle">💛</span>
@@ -239,7 +239,19 @@
         <option value="en-CA-ClaraNeural">Clara (Canadian)</option>
         <option value="en-GB-SoniaNeural">Sonia (British)</option>
       </select></label>
-      <button id="testVoice">Test voice</button>
+      <label class="check" style="margin-top:6px"><input type="checkbox" id="sAvatarOn"> Live photorealistic Maya (Azure avatar)</label>
+      <label>Avatar<select id="sAvatar">
+        <option value="meg/casual">Meg, casual</option>
+        <option value="meg/business">Meg, business</option>
+        <option value="lori/casual">Lori, casual</option>
+        <option value="lori/graceful">Lori, graceful</option>
+        <option value="lisa/casual-sitting">Lisa, casual sitting</option>
+        <option value="lisa/coach-standing">Lisa, coach standing (preview)</option>
+      </select></label>
+      <label>Daily cap (minutes of live video)<input id="sAvatarCap" type="number" min="1" max="120"></label>
+      <p class="hint" id="sAvatarUse"></p>
+      <p class="hint">The live avatar needs a Speech resource in East US 2, West US 2, South Central US, North Europe, West Europe, Sweden Central or Southeast Asia, on the S0 tier. It costs about $0.50 per minute while connected and disconnects after 45 seconds of silence.</p>
+      <button id="testVoice">Test Maya</button>
     </div>
     <div class="panel">
       <h3>Data</h3>
@@ -276,6 +288,8 @@
 <script src="charts.js"></script>
 <script src="fx.js"></script>
 <script src="services.js"></script>
+<script src="vendor/speech-sdk.min.js"></script>
+<script src="liveavatar.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -34,6 +34,24 @@
   };
   const allMaya = () => Object.values(maya);
   function mayaMood(m) { allMaya().forEach(i => i.setMood(m)); }
+
+  // Live photorealistic avatar (Azure). Cartoon Maya only shows if the live avatar is off or failing.
+  let liveBroken = false;
+  const liveMode = () => settings.avatarOn !== false && !!settings.azureKey && !liveBroken && !!self.LiveMaya;
+  const boxes = { today: $('mayaHero'), maya: $('mayaCoach'), log: $('mayaResult') };
+  function activeBox() {
+    const t = (document.querySelector('.tab.active') || {}).id || 'tab-today';
+    return t === 'tab-maya' ? boxes.maya : t === 'tab-log' ? boxes.log : boxes.today;
+  }
+  function applyLiveMode() {
+    document.body.classList.toggle('live-mode', liveMode());
+    if (liveMode()) Object.values(boxes).forEach(b => LiveMaya.decorate(b));
+  }
+  addEventListener('lose20-poster', applyLiveMode);
+  addEventListener('lose20-avatar-error', e => {
+    if (!liveBroken) toast('Live Maya unavailable: ' + e.detail + '. Using voice only.');
+    liveBroken = true; applyLiveMode();   // retried after Settings are saved or the app reopens
+  });
   function mayaPose(p, ms) { [maya.hero, maya.coach].forEach(i => i.pose(p, ms)); }
 
   // Speak with lip-sync; pose while talking.
@@ -44,6 +62,14 @@
     if (opts.mood) mayaMood(opts.mood);
     if (opts.bubble !== false) $('bubble').textContent = text;
     const inst = allMaya();
+    if (liveMode() && settings.voiceOn) {
+      Services.stopSpeaking();
+      LiveMaya.speak(settings, text, opts.box || activeBox()).then(ok => { if (!ok) speakAudio(text, inst); });
+      return;
+    }
+    speakAudio(text, inst);
+  }
+  function speakAudio(text, inst) {
     Services.speak(settings, text,
       () => { if (!inst[0].svg.classList.contains('lipsync')) inst.forEach(i => i.talk(true)); },
       () => inst.forEach(i => i.talk(false)),
@@ -317,7 +343,7 @@
     if (light === 'green') FX.confetti(70);
     const left = A.remaining - (r.kcal || 0);
     const tail = left >= 0 ? ` That leaves about ${left} calories for today.` : ` That puts you about ${-left} over for today.`;
-    say(Tips.pick(Tips.REACT[light], r.name || '') + tail, { bubble: false });
+    say(Tips.pick(Tips.REACT[light], r.name || '') + tail, { bubble: false, box: boxes.log });
   }
 
   $('saveMeal').onclick = async () => {
@@ -430,10 +456,10 @@
     Services.stopSpeaking(); $('micBtn').classList.add('listening');
     rec = Services.listen(t => ask(t), () => { rec = null; $('micBtn').classList.remove('listening'); });
   };
-  $('voiceOn').onchange = e => { settings.voiceOn = e.target.checked; saveSettings(); if (!settings.voiceOn) Services.stopSpeaking(); };
+  $('voiceOn').onchange = e => { settings.voiceOn = e.target.checked; saveSettings(); if (!settings.voiceOn) { Services.stopSpeaking(); LiveMaya.stop(); } };
 
   // Maya on the Today screen
-  const heroTap = () => { $('tapHint').hidden = true; say($('bubble').textContent, { pose: 'wave', bubble: false }); };
+  const heroTap = () => { $('tapHint').hidden = true; LiveMaya.attach && liveMode() && LiveMaya.attach(boxes.today); say($('bubble').textContent, { pose: 'wave', bubble: false }); };
   $('mayaHero').onclick = heroTap;
   $('hearBtn').onclick = heroTap;
   $('tipBtn').onclick = () => { const t = tipLine(); say(t, { pose: Math.random() < .5 ? 'thumbs' : 'think' }); };
@@ -459,6 +485,10 @@
     $('sAnthKey').value = settings.anthropicKey || ''; $('sModel').value = settings.model || '';
     $('sRepo').value = settings.ghRepo || ''; $('sGhToken').value = settings.ghToken || '';
     $('sAzKey').value = settings.azureKey || ''; $('sAzRegion').value = settings.azureRegion || ''; $('sVoice').value = settings.voice;
+    $('sAvatarOn').checked = settings.avatarOn !== false;
+    $('sAvatar').value = (settings.avatarCharacter || 'meg') + '/' + (settings.avatarStyle || 'casual');
+    $('sAvatarCap').value = settings.avatarCapMin || 10;
+    $('sAvatarUse').textContent = `Live avatar used ${LiveMaya.minutesToday()} of ${settings.avatarCapMin || 10} min today.`;
   }
   $('saveProfile').onclick = () => {
     Object.assign(state.profile, {
@@ -472,12 +502,14 @@
     Object.assign(settings, {
       anthropicKey: $('sAnthKey').value.trim(), model: $('sModel').value.trim() || 'claude-sonnet-5-5',
       ghRepo: $('sRepo').value.trim(), ghToken: $('sGhToken').value.trim(),
-      azureKey: $('sAzKey').value.trim(), azureRegion: $('sAzRegion').value.trim(), voice: $('sVoice').value
+      azureKey: $('sAzKey').value.trim(), azureRegion: $('sAzRegion').value.trim(), voice: $('sVoice').value,
+      avatarOn: $('sAvatarOn').checked, avatarCharacter: $('sAvatar').value.split('/')[0], avatarStyle: $('sAvatar').value.split('/')[1],
+      avatarCapMin: Math.max(1, +$('sAvatarCap').value || 10)
     });
-    saveSettings();
+    saveSettings(); liveBroken = false; LiveMaya.close(); applyLiveMode();
   }
   $('saveKeys').onclick = () => { readKeys(); toast('Saved'); doSync(true); };
-  $('testVoice').onclick = () => { readKeys(); const was = settings.voiceOn; settings.voiceOn = true; say(`Hi ${state.profile.name}, I'm ${state.profile.coachName}. Let's lose those twenty pounds together!`, { pose: 'wave', bubble: false }); settings.voiceOn = was; };
+  $('testVoice').onclick = () => { readKeys(); go('maya'); const was = settings.voiceOn; settings.voiceOn = true; say(`Hi ${state.profile.name}, I'm ${state.profile.coachName}. Let's lose those twenty pounds together!`, { pose: 'wave', bubble: false }); settings.voiceOn = was; };
   $('exportBtn').onclick = () => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 1)], { type: 'application/json' }));
@@ -501,7 +533,7 @@
   function applySetup() {
     if (!location.hash.startsWith('#setup')) return;
     const h = new URLSearchParams(location.hash.slice(1));
-    const map = { key: 'anthropicKey', repo: 'ghRepo', gh: 'ghToken', az: 'azureKey', region: 'azureRegion' };
+    const map = { key: 'anthropicKey', repo: 'ghRepo', gh: 'ghToken', az: 'azureKey', region: 'azureRegion', avatar: 'avatarCharacter', astyle: 'avatarStyle' };
     Object.entries(map).forEach(([k, s]) => { if (h.get(k)) settings[s] = h.get(k); });
     saveSettings();
     history.replaceState(null, '', location.pathname + location.search);
@@ -513,6 +545,7 @@
   // ---------- boot ----------
   if (!localStorage.getItem(SKEY)) saveState();
   $('voiceOn').checked = !!settings.voiceOn;
+  applyLiveMode();
   if (DESK) document.body.classList.add('desk');
   refresh();
   if (DESK) {
