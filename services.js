@@ -92,9 +92,13 @@ ${summary}`;
   // at low effort with no up-front thinking, so the first recipes show up in seconds.
   const SHARE = { breakfast: 0.22, lunch: 0.30, dinner: 0.33, snack: 0.10 };
   const STYLES = ['Mediterranean', 'Mexican', 'East Asian', 'classic North American', 'Italian', 'Middle Eastern', 'Indian', 'Greek', 'Japanese', 'Thai', 'Cajun', 'French bistro'];
-  async function planOne(settings, o, slot, style) {
+  const MAINS = { breakfast: ['eggs', 'Greek yogurt', 'cottage cheese', 'oats with protein powder', 'smoked turkey', 'egg whites'],
+    lunch: ['chicken breast', 'turkey', 'lean beef', 'shrimp', 'lentils and beans', 'pork tenderloin', 'salmon'],
+    dinner: ['chicken thighs', 'lean beef', 'pork tenderloin', 'shrimp', 'white fish', 'turkey', 'salmon', 'beans and lentils'],
+    snack: ['Greek yogurt', 'cottage cheese', 'edamame', 'jerky', 'eggs', 'hummus'] };
+  async function planOne(settings, o, slot, style, main) {
     const kcal = Math.round(o.kcal * SHARE[slot] / 10) * 10;
-    const prompt = `Write one healthy ${slot} recipe, ${style} style, for a ${o.age}-year-old ${o.sex} losing weight while lifting weights. Aim for about ${kcal} kcal and at least ${Math.round(o.protein * SHARE[slot])} g protein per serving, plenty of vegetables or fiber, simple home cooking, common supermarket ingredients, 30 minutes or less if possible.
+    const prompt = `Write one healthy ${slot} recipe, ${style} style, built around ${main}, for a ${o.age}-year-old ${o.sex} losing weight while lifting weights. Aim for about ${kcal} kcal and at least ${Math.round(o.protein * SHARE[slot])} g protein per serving, plenty of vegetables or fiber, simple home cooking, common supermarket ingredients, 30 minutes or less if possible.
 ${o.notes ? 'His preferences: ' + o.notes + '\n' : ''}${o.excludeIngredients && o.excludeIngredients.length ? 'Never use these ingredients (or anything made from them): ' + o.excludeIngredients.join(', ') + '\n' : ''}${o.excludeMeals && o.excludeMeals.length ? 'He dislikes these dishes, so suggest nothing like them: ' + o.excludeMeals.join('; ') + '\n' : ''}${o.avoid && o.avoid.length ? 'Do not repeat: ' + o.avoid.join('; ') + '\n' : ''}Return ONLY a JSON object: {"title":string,"slot":"${slot}","servings":number,"time_min":number,"kcal":number per serving,"protein_g":number,"carbs_g":number,"fat_g":number,"fiber_g":number,"why":"one short sentence on why it helps him","ingredients":[{"item":string,"qty":string for all servings,"aisle":"Produce|Meat & fish|Dairy & eggs|Bakery|Pantry|Frozen|Other"}],"steps":[string, 3-7 short steps]}`;
     const j = await claudeRaw(settings, { max_tokens: 4000, messages: [{ role: 'user', content: prompt }], output_config: { effort: 'low' }, thinking: { type: 'between_tools' } }, 'recipes');
     const text = j.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
@@ -102,10 +106,15 @@ ${o.notes ? 'His preferences: ' + o.notes + '\n' : ''}${o.excludeIngredients && 
   }
   async function planMeals(settings, o, onRecipe) {
     const jobs = [];
-    const styles = STYLES.slice().sort(() => Math.random() - 0.5);
+    const shuffle = a => a.slice().sort(() => Math.random() - 0.5);
+    const styles = shuffle(STYLES), banned = (o.excludeIngredients || []).map(x => x.toLowerCase());
+    const mains = {}; Object.keys(MAINS).forEach(k => { const ok = MAINS[k].filter(m => !banned.some(b => m.includes(b) || b.includes(m))); mains[k] = shuffle(ok.length ? ok : MAINS[k]); });
+    const used = {};
     for (let i = 0; i < o.count; i++) {
-      const slot = o.slots[i % o.slots.length];
-      jobs.push(planOne(settings, o, slot, styles[i % styles.length]).then(r => { if (onRecipe) onRecipe(r); return r; }, e => ({ error: e.message })));
+      const slot = o.slots[i % o.slots.length], n = used[slot] = (used[slot] || 0) + 1;
+      const args = [settings, o, slot, styles[i % styles.length], mains[slot][(n - 1) % mains[slot].length]];
+      jobs.push(planOne(...args).catch(() => planOne(...args))     // one retry if a request fails
+        .then(r => { if (onRecipe) onRecipe(r); return r; }, e => ({ error: e.message })));
     }
     const all = await Promise.all(jobs);
     const ok = all.filter(r => r && !r.error);
