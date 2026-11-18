@@ -26,7 +26,17 @@ Return ONLY a JSON object with the same fields as: {"name","items":[{"food","por
     return JSON.parse(text.slice(a, b + 1));
   }
 
-  async function claudeRaw(settings, body) {
+  // Usage reporting: every Claude call and every Azure voice clip is reported to listeners (the app logs them).
+  const usageListeners = [];
+  function onUsage(f) { usageListeners.push(f); }
+  function report(u) { usageListeners.forEach(f => { try { f(u); } catch (e) { /* ignore */ } }); }
+  function reportClaude(kind, model, j) {
+    const u = j.usage || {};
+    report({ service: 'claude', kind, model, input: u.input_tokens || 0, output: u.output_tokens || 0,
+      cacheRead: u.cache_read_input_tokens || 0, cacheWrite: u.cache_creation_input_tokens || 0 });
+  }
+
+  async function claudeRaw(settings, body, kind) {
     if (!settings.anthropicKey) throw new Error('Add your Claude API key in Settings.');
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -35,23 +45,12 @@ Return ONLY a JSON object with the same fields as: {"name","items":[{"food","por
     });
     const j = await r.json();
     if (!r.ok) throw new Error((j.error && j.error.message) || ('Claude API error ' + r.status));
+    reportClaude(kind || 'other', settings.model || 'claude-sonnet-5-5', j);
     return j;
   }
 
-  async function claude(settings, messages, system, maxTokens) {
-    if (!settings.anthropicKey) throw new Error('Add your Claude API key in Settings.');
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': settings.anthropicKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({ model: settings.model || 'claude-sonnet-5-5', max_tokens: maxTokens || 4000, system, messages })
-    });
-    const j = await r.json();
-    if (!r.ok) throw new Error((j.error && j.error.message) || ('Claude API error ' + r.status));
+  async function claude(settings, messages, system, maxTokens, kind) {
+    const j = await claudeRaw(settings, { max_tokens: maxTokens || 4000, system, messages }, kind);
     const text = j.content.filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
     if (!text) throw new Error('Claude returned no text (stop reason: ' + j.stop_reason + '). Try again.');
     return text;
@@ -62,12 +61,12 @@ Return ONLY a JSON object with the same fields as: {"name","items":[{"food","por
     const text = await claude(settings, [{ role: 'user', content: [
       { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Jpeg } },
       { type: 'text', text: prompt }
-    ] }]);
+    ] }], undefined, undefined, 'meal photo');
     return extractJson(text);
   }
 
   async function analyzeMealText(settings, description) {
-    const text = await claude(settings, [{ role: 'user', content: TEXT_PROMPT.replace('{{TEXT}}', description.replace(/"/g, "'")) }]);
+    const text = await claude(settings, [{ role: 'user', content: TEXT_PROMPT.replace('{{TEXT}}', description.replace(/"/g, "'")) }], undefined, undefined, 'meal text');
     return extractJson(text);
   }
 
@@ -86,16 +85,32 @@ ${summary}`;
   async function coachReply(settings, profile, summary, history, desk) {
     const msgs = history.slice(-12);
     while (msgs.length && msgs[0].role !== 'user') msgs.shift();   // API needs a user turn first
-    return claude(settings, msgs, coachSystem(profile, summary, desk), 2000);
+    return claude(settings, msgs, coachSystem(profile, summary, desk), 2000, 'report card');
   }
 
-  // Meal ideas with full recipes, sized to his targets.
-  async function planMeals(settings, o) {
-    const prompt = `Create ${o.count} healthy recipes for a ${o.age}-year-old ${o.sex} losing weight while lifting weights. Daily targets: ${o.kcal} kcal, ${o.protein} g protein, 30 g fiber.
-Meals wanted: ${o.slots.join(', ')}. Size each recipe so a day of these meals fits the calorie target (roughly breakfast 22%, lunch 30%, dinner 33%, snack 10%), high in protein, lots of vegetables, simple home cooking, common supermarket ingredients, mostly 30 minutes or less.
-${o.notes ? 'His preferences: ' + o.notes + '\n' : ''}${o.avoid && o.avoid.length ? 'Do not repeat these recent recipes: ' + o.avoid.join('; ') + '\n' : ''}Return ONLY a JSON object: {"recipes":[{"title":string,"slot":"breakfast|lunch|dinner|snack","servings":number,"time_min":number,"kcal":number per serving,"protein_g":number,"carbs_g":number,"fat_g":number,"fiber_g":number,"why":"one short sentence on why it helps him","ingredients":[{"item":string,"qty":string for all servings,"aisle":"Produce|Meat & fish|Dairy & eggs|Bakery|Pantry|Frozen|Other"}],"steps":[string, 3-7 short steps]}]}`;
-    const text = await claude(settings, [{ role: 'user', content: prompt }], undefined, 16000);
-    return extractJson(text).recipes || [];
+  // Meal ideas with full recipes, sized to his targets. One request per recipe, run in parallel, each
+  // at low effort with no up-front thinking, so the first recipes show up in seconds.
+  const SHARE = { breakfast: 0.22, lunch: 0.30, dinner: 0.33, snack: 0.10 };
+  const STYLES = ['Mediterranean', 'Mexican', 'East Asian', 'classic North American', 'Italian', 'Middle Eastern', 'Indian', 'Greek', 'Japanese', 'Thai', 'Cajun', 'French bistro'];
+  async function planOne(settings, o, slot, style) {
+    const kcal = Math.round(o.kcal * SHARE[slot] / 10) * 10;
+    const prompt = `Write one healthy ${slot} recipe, ${style} style, for a ${o.age}-year-old ${o.sex} losing weight while lifting weights. Aim for about ${kcal} kcal and at least ${Math.round(o.protein * SHARE[slot])} g protein per serving, plenty of vegetables or fiber, simple home cooking, common supermarket ingredients, 30 minutes or less if possible.
+${o.notes ? 'His preferences: ' + o.notes + '\n' : ''}${o.excludeIngredients && o.excludeIngredients.length ? 'Never use these ingredients (or anything made from them): ' + o.excludeIngredients.join(', ') + '\n' : ''}${o.excludeMeals && o.excludeMeals.length ? 'He dislikes these dishes, so suggest nothing like them: ' + o.excludeMeals.join('; ') + '\n' : ''}${o.avoid && o.avoid.length ? 'Do not repeat: ' + o.avoid.join('; ') + '\n' : ''}Return ONLY a JSON object: {"title":string,"slot":"${slot}","servings":number,"time_min":number,"kcal":number per serving,"protein_g":number,"carbs_g":number,"fat_g":number,"fiber_g":number,"why":"one short sentence on why it helps him","ingredients":[{"item":string,"qty":string for all servings,"aisle":"Produce|Meat & fish|Dairy & eggs|Bakery|Pantry|Frozen|Other"}],"steps":[string, 3-7 short steps]}`;
+    const j = await claudeRaw(settings, { max_tokens: 4000, messages: [{ role: 'user', content: prompt }], output_config: { effort: 'low' }, thinking: { type: 'between_tools' } }, 'recipes');
+    const text = j.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+    return extractJson(text);
+  }
+  async function planMeals(settings, o, onRecipe) {
+    const jobs = [];
+    const styles = STYLES.slice().sort(() => Math.random() - 0.5);
+    for (let i = 0; i < o.count; i++) {
+      const slot = o.slots[i % o.slots.length];
+      jobs.push(planOne(settings, o, slot, styles[i % styles.length]).then(r => { if (onRecipe) onRecipe(r); return r; }, e => ({ error: e.message })));
+    }
+    const all = await Promise.all(jobs);
+    const ok = all.filter(r => r && !r.error);
+    if (!ok.length) throw new Error((all[0] && all[0].error) || 'No recipes came back. Try again.');
+    return ok;
   }
 
   // Chat with tools: Maya can add, change and delete log entries when asked.
@@ -106,7 +121,7 @@ ${o.notes ? 'His preferences: ' + o.notes + '\n' : ''}${o.avoid && o.avoid.lengt
     const system = coachSystem(profile, summary, desk) + '\n\n' + context;
     const actions = [];
     for (let turn = 0; turn < 6; turn++) {
-      const j = await claudeRaw(settings, { system, messages: msgs, tools, max_tokens: 3000 });
+      const j = await claudeRaw(settings, { system, messages: msgs, tools, max_tokens: 3000, output_config: { effort: 'medium' } }, 'chat');
       const uses = j.content.filter(c => c.type === 'tool_use');
       if (j.stop_reason !== 'tool_use' || !uses.length) {
         const text = j.content.filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
@@ -149,6 +164,7 @@ ${o.notes ? 'His preferences: ' + o.notes + '\n' : ''}${o.avoid && o.avoid.lengt
           body: ssml
         });
         if (!r.ok) throw new Error('Azure speech error ' + r.status);
+        report({ service: 'azure', kind: 'voice', model: voice, chars: text.length });
         const blob = await r.blob();
         if (my !== gen) { end && end(); return; }          // stopped or muted while the voice was downloading
         audioEl = new Audio(URL.createObjectURL(blob));
@@ -258,5 +274,5 @@ ${o.notes ? 'His preferences: ' + o.notes + '\n' : ''}${o.avoid && o.avoid.lengt
     });
   }
 
-  root.Services = { analyzeMealPhoto, analyzeMealText, coachReply, coachAct, planMeals, speak, stopSpeaking, onSpeaking, isSpeaking, listen, sync, ghPull, putThumb, getThumb, resizeImage };
+  root.Services = { analyzeMealPhoto, analyzeMealText, coachReply, coachAct, planMeals, onUsage, speak, stopSpeaking, onSpeaking, isSpeaking, listen, sync, ghPull, putThumb, getThumb, resizeImage };
 })(self);

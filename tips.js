@@ -115,7 +115,9 @@
     const roomy = n => Math.max(...IDEAS[n].map(i => i[1]));
     if (kcalLeft > 1300 && !open.includes('snack')) open.push('snack');     // room for a planned snack
     if (kcalLeft - open.reduce((a, n) => a + roomy(n), 0) > 200) open.push('snack');
-    const pools = open.map(n => IDEAS[n].map(i => ({ slot: n, name: i[0], kcal: i[1], protein: i[2] })));
+    const banned = (opts.exclude || []).map(x => x.toLowerCase().replace(/s$/, '')).filter(Boolean);
+    const okIdea = name => !banned.some(b => name.toLowerCase().includes(b));
+    const pools = open.map(n => { const all = IDEAS[n].map(i => ({ slot: n, name: i[0], kcal: i[1], protein: i[2] })), ok = all.filter(i => okIdea(i.name)); return ok.length ? ok : all; });
     let best = null;
     const walk = (k, chosen, kc, pr) => {
       if (k === pools.length) {

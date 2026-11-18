@@ -18,6 +18,7 @@ import random
 import subprocess
 import sys
 import tempfile
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -215,10 +216,51 @@ def claude_message(cfg, s, slot):
                        "system": system, "messages": [{"role": "user", "content": user}]}).encode()
     raw = http("https://api.anthropic.com/v1/messages", "POST",
                {"x-api-key": cfg["anthropic_key"], "anthropic-version": "2023-06-01", "content-type": "application/json"}, body)
-    text = " ".join(c["text"] for c in json.loads(raw)["content"] if c["type"] == "text").strip()
+    j = json.loads(raw)
+    u = j.get("usage", {})
+    USAGE.append({"kind": "windows check-in", "service": "claude", "input": u.get("input_tokens", 0), "output": u.get("output_tokens", 0),
+                  "cacheRead": u.get("cache_read_input_tokens", 0), "cacheWrite": u.get("cache_creation_input_tokens", 0)})
+    text = " ".join(c["text"] for c in j["content"] if c["type"] == "text").strip()
     if not text:
         raise ValueError("Claude returned no text")   # falls back to the template message
     return text
+
+
+# ---------------------------------------------------------------- usage log
+USAGE = []   # filled during this run, then added to the synced data so the app can show costs
+
+
+def push_usage(cfg):
+    """Add this run's token and voice usage to data.json (one record per day and kind, like the app)."""
+    if not USAGE or not cfg.get("github_token"):
+        return
+    url = f"https://api.github.com/repos/{cfg['github_repo']}/contents/{cfg.get('github_path', 'data.json')}"
+    hdr = {"Authorization": "Bearer " + cfg["github_token"], "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+    for attempt in range(3):
+        try:
+            j = json.loads(http(url, headers=hdr))
+            data = json.loads(base64.b64decode(j["content"]).decode("utf-8"))
+            rows = data.setdefault("usage", [])
+            today = dt.date.today().isoformat()
+            now_ms = int(dt.datetime.now().timestamp() * 1000)
+            for u in USAGE:
+                rid = f"{today}|pc-checkin|{u['kind']}"
+                r = next((x for x in rows if x.get("id") == rid), None)
+                if not r:
+                    r = {"id": rid, "date": today, "device": "pc-checkin", "kind": u["kind"], "service": u["service"],
+                         "calls": 0, "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "chars": 0}
+                    rows.append(r)
+                r["calls"] += 1
+                for k in ("input", "output", "cacheRead", "cacheWrite", "chars"):
+                    r[k] = r.get(k, 0) + u.get(k, 0)
+                r["updatedAt"] = now_ms
+            body = json.dumps({"message": "usage from Windows check-in", "sha": j["sha"],
+                               "content": base64.b64encode(json.dumps(data).encode("utf-8")).decode()}).encode()
+            http(url, "PUT", dict(hdr, **{"Content-Type": "application/json"}), body)
+            return
+        except urllib.error.HTTPError as e:
+            if e.code != 409 or attempt == 2:
+                raise
 
 
 # ---------------------------------------------------------------- voice and window
@@ -230,6 +272,7 @@ def speak(cfg, text, voice=None):
                  {"Ocp-Apim-Subscription-Key": cfg["azure_key"], "Content-Type": "application/ssml+xml",
                   "X-Microsoft-OutputFormat": "riff-24khz-16bit-mono-pcm", "User-Agent": "lose20"},
                  ssml.encode("utf-8"))
+    USAGE.append({"kind": "voice", "service": "azure", "chars": len(text)})
     path = Path(tempfile.gettempdir()) / "lose20_maya.wav"
     path.write_bytes(audio)
     import winsound  # Windows only
@@ -342,6 +385,10 @@ def main():
             speak(cfg, msg, (s.get("coach_voice") if state else None))
         except Exception as e:
             log(f"voice failed: {e}")
+    try:
+        push_usage(cfg)
+    except Exception as e:
+        log(f"usage log failed: {e}")
 
 
 if __name__ == "__main__":

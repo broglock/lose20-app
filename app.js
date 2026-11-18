@@ -15,7 +15,7 @@
   // ---------- storage ----------
   const SKEY = 'lose20.state', KKEY = 'lose20.settings', CKEY = 'lose20.celebrated';
   let state = load(SKEY) || Coach.defaultState(today());
-  ['weights', 'meals', 'workouts', 'plans', 'planChecks', 'reports', 'groceries', 'recipes'].forEach(k => { if (!Array.isArray(state[k])) state[k] = []; });
+  ['weights', 'meals', 'workouts', 'plans', 'planChecks', 'reports', 'groceries', 'recipes', 'usage'].forEach(k => { if (!Array.isArray(state[k])) state[k] = []; });
   let settings = Object.assign({ voiceOn: true, model: 'claude-sonnet-5-5', voice: '' }, load(KKEY) || {});
   if (!settings.voiceV2) { settings.voice = ''; settings.voiceV2 = 1; }   // default: each coach's own voice
   let celebrated = load(CKEY) || {};
@@ -36,6 +36,39 @@
     result: MayaKind.create($('mayaResult'), { backdrop: true })
   };
   const allMaya = () => Object.values(maya);
+
+  // ---------- API usage ----------
+  // One record per day, device and feature (id = date|device|kind), so devices never overwrite each other.
+  if (!settings.deviceId) { settings.deviceId = (DESK ? 'pc-' : 'dev-') + uid().slice(0, 6); localStorage.setItem(KKEY, JSON.stringify(settings)); }
+  const DEVICE = (DESK ? 'pc-' : '') + settings.deviceId;
+  const PRICE = () => Object.assign({ in: 2, out: 10, cacheRead: 0.2, cacheWrite: 2.5, azure: 15 }, settings.prices || {});
+  Services.onUsage(u => {
+    const d = today(), id = `${d}|${DEVICE}|${u.service === 'azure' ? 'voice' : u.kind}`;
+    let r = state.usage.find(x => x.id === id);
+    if (!r) { r = { id, date: d, device: DEVICE, kind: u.service === 'azure' ? 'voice' : u.kind, service: u.service, calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, chars: 0 }; state.usage.push(r); }
+    r.calls++; r.input += u.input || 0; r.output += u.output || 0; r.cacheRead += u.cacheRead || 0; r.cacheWrite += u.cacheWrite || 0; r.chars += u.chars || 0;
+    r.updatedAt = Date.now(); saveState();
+  });
+  function usageCost(r) { const P = PRICE(); return (r.input * P.in + r.output * P.out + r.cacheRead * P.cacheRead + r.cacheWrite * P.cacheWrite + r.chars * P.azure) / 1e6; }
+  function renderUsage() {
+    const rows = Coach.live(state.usage), d = today(), month = d.slice(0, 7), d30 = Coach.addDays(d, -29);
+    const sum = list => list.reduce((a, r) => ({ calls: a.calls + r.calls, input: a.input + r.input, output: a.output + r.output, chars: a.chars + r.chars, cost: a.cost + usageCost(r) }), { calls: 0, input: 0, output: 0, chars: 0, cost: 0 });
+    const T = sum(rows.filter(r => r.date === d)), M = sum(rows.filter(r => r.date.startsWith(month))), L = sum(rows.filter(r => r.date >= d30));
+    const days = new Set(rows.filter(r => r.date >= d30).map(r => r.date)).size || 1;
+    const by = {}; rows.filter(r => r.date >= d30).forEach(r => { by[r.kind] = by[r.kind] || []; by[r.kind].push(r); });
+    const $$ = n => '$' + (n < 0.01 && n > 0 ? n.toFixed(4) : n.toFixed(2)), k = n => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+    $('usageBody').innerHTML = rows.length ? `<table class="usage">
+      <tr><th></th><th>Requests</th><th>Tokens in / out</th><th>Voice chars</th><th>Cost</th></tr>
+      <tr><td>Today</td><td>${T.calls}</td><td>${k(T.input)} / ${k(T.output)}</td><td>${k(T.chars)}</td><td>${$$(T.cost)}</td></tr>
+      <tr><td>This month</td><td>${M.calls}</td><td>${k(M.input)} / ${k(M.output)}</td><td>${k(M.chars)}</td><td>${$$(M.cost)}</td></tr>
+      <tr><td>Last 30 days</td><td>${L.calls}</td><td>${k(L.input)} / ${k(L.output)}</td><td>${k(L.chars)}</td><td>${$$(L.cost)}</td></tr></table>
+      <p class="sub">About <b>${$$(L.cost / days)}</b> per day used, so roughly <b>${$$(L.cost / days * 30)}</b> a month at this pace.</p>
+      <table class="usage"><tr><th>Last 30 days by feature</th><th>Requests</th><th>Cost</th><th>Per request</th></tr>${Object.entries(by).map(([kind, l]) => { const s2 = sum(l); return [kind, s2]; }).sort((a, b) => b[1].cost - a[1].cost)
+        .map(([kind, s2]) => `<tr><td>${esc(kind)}</td><td>${s2.calls}</td><td>${$$(s2.cost)}</td><td>${$$(s2.cost / s2.calls)}</td></tr>`).join('')}</table>`
+      : '<p class="hint">Nothing counted yet. Usage shows up here after the next photo, chat, recipe or voice clip.</p>';
+    const P = PRICE(); $('prIn').value = P.in; $('prOut').value = P.out; $('prCr').value = P.cacheRead; $('prAz').value = P.azure;
+  }
+  $('prSave').onclick = () => { settings.prices = { in: +$('prIn').value || 2, out: +$('prOut').value || 10, cacheRead: +$('prCr').value || 0.2, cacheWrite: 2.5, azure: +$('prAz').value || 15 }; saveSettings(); renderUsage(); toast('Prices saved'); };
 
   // ---------- coaches ----------
   // The roster (maya/coaches.json) is built by tools/build_coaches.py. The chosen coach lives in the
@@ -150,7 +183,7 @@
     if (tab === 'progress') renderProgress();
     if (tab === 'diary') renderDiary();
     if (tab === 'food') renderFood();
-    if (tab === 'settings') renderSettings();
+    if (tab === 'settings') { renderSettings(); renderUsage(); }
     if (tab === 'maya' && !$('chat').children.length) addMsg('her', greeting());
     window.scrollTo(0, 0);
   }
@@ -342,7 +375,7 @@
   function nextSteps() {
     const d = today(), h = hourNow(), T = A.targets;
     const meals = Coach.live(state.meals).filter(m => m.date === d);
-    const plan = Tips.planRest({ hour: h, kcalLeft: A.remaining, proteinLeft: A.proteinLeft, meals });
+    const plan = Tips.planRest({ hour: h, kcalLeft: A.remaining, proteinLeft: A.proteinLeft, meals, exclude: excl().ing.concat(excl().meals) });
     const acts = [];
     if (!A.weighedToday && h < 11) acts.push('Weigh in now, before you eat.');
     else if (!A.weighedToday) acts.push('Weigh in first thing tomorrow morning.');
@@ -583,12 +616,24 @@
       <p class="r-meta">${Math.round(r.kcal || 0)} kcal · ${Math.round(r.protein_g || 0)} g protein · ${Math.round(r.fiber_g || 0)} g fiber · ${r.time_min || '?'} min · serves ${r.servings || 1}</p>
       ${r.why ? `<p class="r-why">${esc(r.why)}</p>` : ''}
       <details><summary>Ingredients and steps</summary>
-        <ul>${(r.ingredients || []).map(i => `<li>${esc(i.qty || '')} ${esc(i.item)}</li>`).join('')}</ul>
+        <ul class="ing">${(r.ingredients || []).map(i => `<li>${esc(i.qty || '')} ${esc(i.item)} <button class="ban" data-ing="${esc(i.item)}" title="Never use this">🚫</button></li>`).join('')}</ul>
         <ol>${(r.steps || []).map(t => `<li>${esc(t)}</li>`).join('')}</ol></details>
-      <div class="inline r-acts"><button class="small" data-act="shop">🛒 Add ingredients</button><button class="small" data-act="save">${saved ? '♥ Saved' : '♡ Save'}</button><button class="small" data-act="eat">🍽 I ate this</button></div>
+      <div class="inline r-acts"><button class="small" data-act="shop">🛒 Add ingredients</button><button class="small" data-act="save">${saved ? '♥ Saved' : '♡ Save'}</button><button class="small" data-act="eat">🍽 I ate this</button><button class="small" data-act="nope" title="Not for me">👎</button></div>
     </div>`;
   }
+  const excl = () => ({ ing: state.profile.excludeIngredients || [], meals: state.profile.excludeMeals || [] });
+  function setExcl(kind, list) { state.profile[kind] = [...new Set(list.map(x => x.trim()).filter(Boolean))]; state.profile.updatedAt = Date.now(); saveState(); renderExcl(); }
+  function renderExcl() {
+    const E = excl();
+    $('exclChips').innerHTML = E.ing.map(x => `<span class="chip-x" data-k="excludeIngredients" data-v="${esc(x)}">🚫 ${esc(x)} <b>✕</b></span>`).join('') +
+      E.meals.map(x => `<span class="chip-x meal" data-k="excludeMeals" data-v="${esc(x)}">👎 ${esc(x)} <b>✕</b></span>`).join('') || '<span class="hint">Nothing excluded yet.</span>';
+  }
+  const addExcl = kind => { const v = $('exclInput').value.split(',').map(x => x.trim()).filter(Boolean); if (!v.length) return; setExcl(kind, (state.profile[kind] || []).concat(v)); $('exclInput').value = ''; };
+  $('exclIngBtn').onclick = () => addExcl('excludeIngredients');
+  $('exclMealBtn').onclick = () => addExcl('excludeMeals');
+  $('exclChips').onclick = e => { const c = e.target.closest('.chip-x'); if (c) setExcl(c.dataset.k, (state.profile[c.dataset.k] || []).filter(x => x !== c.dataset.v)); };
   function renderFood() {
+    renderExcl();
     const saved = Coach.live(state.recipes);
     const savedIds = new Set(saved.map(r => r.id));
     const drafts = draftRecipes.filter(r => !savedIds.has(r.id));
@@ -614,19 +659,22 @@
   $('mpGo').onclick = async () => {
     const slots = [...$('mpSlots').querySelectorAll('.on')].map(b => b.dataset.s);
     if (!slots.length) return toast('Pick at least one meal');
-    const T = A.targets, p = state.profile;
-    $('mpGo').disabled = true; $('mpStatus').textContent = CN() + ' is writing recipes… (about 30 seconds)';
+    const T = A.targets, p = state.profile, E = excl(), n = +$('mpCount').value;
+    $('mpGo').disabled = true; $('mpStatus').textContent = CN() + ' is writing recipes…';
+    draftRecipes = []; let got = 0;
     try {
-      const list = await Services.planMeals(settings, { count: +$('mpCount').value, slots, notes: $('mpNotes').value.trim(), kcal: T.kcal, protein: T.protein, age: p.age, sex: p.sex,
-        avoid: draftRecipes.concat(Coach.live(state.recipes)).map(r => r.title).slice(-20) });
-      draftRecipes = list.map(r => Object.assign({ id: uid() }, r));
-      localStorage.setItem('lose20.recipeDraft', JSON.stringify(draftRecipes));
-      $('mpStatus').textContent = ''; renderFood();
-      say(`Here are ${list.length} ideas. Save the ones you like and tap the cart to put the ingredients on your list.`, { pose: 'thumbs', bubble: false });
+      await Services.planMeals(settings, { count: n, slots, notes: $('mpNotes').value.trim(), kcal: T.kcal, protein: T.protein, age: p.age, sex: p.sex,
+        excludeIngredients: E.ing, excludeMeals: E.meals, avoid: Coach.live(state.recipes).map(r => r.title).slice(-20) },
+        r => { got++; draftRecipes.push(Object.assign({ id: uid() }, r)); localStorage.setItem('lose20.recipeDraft', JSON.stringify(draftRecipes));
+               $('mpStatus').textContent = `${got} of ${n} ready…`; renderFood(); });
+      $('mpStatus').textContent = '';
+      say(`Here are ${got} ideas. Save the ones you like and tap the cart to put the ingredients on your list.`, { pose: 'thumbs', bubble: false });
     } catch (e) { $('mpStatus').textContent = e.message; }
     $('mpGo').disabled = false;
   };
   $('recipeList').onclick = e => {
+    const ban = e.target.closest('.ban');
+    if (ban) { setExcl('excludeIngredients', excl().ing.concat(ban.dataset.ing)); toast(`Won't suggest ${ban.dataset.ing} again`); ban.closest('li').classList.add('banned'); return; }
     const b = e.target.closest('[data-act]'); if (!b) return;
     const id = b.closest('.recipe').dataset.rid;
     const r = Coach.live(state.recipes).find(x => x.id === id) || draftRecipes.find(x => x.id === id); if (!r) return;
@@ -640,6 +688,11 @@
       else if (s) { s.deleted = false; s.updatedAt = Date.now(); }
       else state.recipes.push(Object.assign({}, r, { updatedAt: Date.now() }));
       saveState(); renderFood();
+    } else if (b.dataset.act === 'nope') {
+      setExcl('excludeMeals', excl().meals.concat(r.title));
+      draftRecipes = draftRecipes.filter(x => x.id !== id); localStorage.setItem('lose20.recipeDraft', JSON.stringify(draftRecipes));
+      const sv = state.recipes.find(x => x.id === id); if (sv) { sv.deleted = true; sv.updatedAt = Date.now(); saveState(); }
+      renderFood(); toast('Got it. Nothing like that again.');
     } else if (b.dataset.act === 'eat') {
       const before = Gamify.dayPoints(state, today()).total;
       state.meals.push({ id: uid(), date: today(), time: nowTime(), name: r.title, kcal: Math.round(r.kcal || 0), protein: Math.round(r.protein_g || 0), carbs: Math.round(r.carbs_g || 0),

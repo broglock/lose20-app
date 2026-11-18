@@ -323,3 +323,15 @@ body.desk .maya-box.big.pmaya{max-width:380px}
 .gro-row input{min-width:0;padding:5px 7px;font-size:16px}
 .gro-row.done .g-item{text-decoration:line-through;opacity:.55}
 .gro-row .g-del{background:none;border:none;box-shadow:none;color:#a33;padding:0}
+
+/* exclusions and usage */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip-x{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border:2px solid var(--ink);border-radius:999px;background:#fbe3e3;font-size:15px;cursor:pointer}
+.chip-x.meal{background:#efe7d6}
+.chip-x b{font-size:12px;opacity:.6}
+.recipe .ing li{display:flex;align-items:center;gap:6px}
+.recipe .ban{background:none;border:none;box-shadow:none;padding:0 4px;font-size:14px;opacity:.5;margin-left:auto}
+.recipe .ing li.banned{text-decoration:line-through;opacity:.5}
+table.usage{width:100%;border-collapse:collapse;font-size:15px;margin:6px 0}
+table.usage th,table.usage td{text-align:right;padding:3px 4px;border-bottom:1px dashed #cfc4b0}
+table.usage th:first-child,table.usage td:first-child{text-align:left}

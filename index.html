@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/maya-a-icon-192.png">
 <link rel="preload" href="fonts/caveat-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/patrick-hand-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="styles.css?v=1.7.0">
+<link rel="stylesheet" href="styles.css?v=1.8.0">
 </head>
 <body>
 <header class="top">
@@ -164,6 +164,12 @@
       <label>Likes, dislikes, what's in the fridge<input id="mpNotes" placeholder="e.g. no fish, love Mexican, have chicken thighs"></label>
       <button class="primary" id="mpGo">✨ Get recipes</button> <span id="mpStatus" class="hint"></span>
     </div>
+    <div class="panel" id="excludePanel">
+      <h3>Never suggest</h3>
+      <p class="sub">Foods and dishes you don't like. Recipes and meal ideas will leave them out. You can also tap 👎 on a recipe or 🚫 next to an ingredient.</p>
+      <div class="inline"><input id="exclInput" placeholder="e.g. mushrooms, tuna, tofu"><button id="exclIngBtn">+ Ingredient</button><button id="exclMealBtn">+ Dish</button></div>
+      <div id="exclChips" class="chips"></div>
+    </div>
     <div id="recipeList"></div>
     <div class="panel butter" id="groceryPanel">
       <span class="doodle">🛒</span>
@@ -257,6 +263,21 @@
       <label>Token<input id="sGhToken" type="password" autocomplete="off"></label>
     </div>
     <div class="panel">
+      <h3>API usage and cost</h3>
+      <p class="sub">Every Claude request and voice clip is counted on each device (phone, PC window and Windows check-ins) and synced.</p>
+      <div id="usageBody"></div>
+      <details><summary>Prices used</summary>
+        <div class="grid2f">
+          <label>Claude input $/M tokens<input id="prIn" type="number" step="0.01"></label>
+          <label>Claude output $/M tokens<input id="prOut" type="number" step="0.01"></label>
+          <label>Cache read $/M<input id="prCr" type="number" step="0.01"></label>
+          <label>Azure voice $/M chars<input id="prAz" type="number" step="0.01"></label>
+        </div>
+        <p class="hint">Defaults: Claude Sonnet 5.5 at $2 in, $10 out, $0.20 cache reads per million tokens; Azure neural voices at $15 per million characters (checked Nov 2026).</p>
+        <button class="small" id="prSave">Save prices</button>
+      </details>
+    </div>
+    <div class="panel">
       <h3>Your coach</h3>
       <p class="sub">Tap a coach to switch. Each has her own voice and style.</p>
       <div id="coachGrid" class="coach-grid"></div>
@@ -330,15 +351,15 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="version.js?v=1.7.0"></script>
-<script src="coach.js?v=1.7.0"></script>
-<script src="gamify.js?v=1.7.0"></script>
-<script src="tips.js?v=1.7.0"></script>
-<script src="avatar.js?v=1.7.0"></script>
-<script src="charts.js?v=1.7.0"></script>
-<script src="fx.js?v=1.7.0"></script>
-<script src="services.js?v=1.7.0"></script>
-<script src="photomaya.js?v=1.7.0"></script>
-<script src="app.js?v=1.7.0"></script>
+<script src="version.js?v=1.8.0"></script>
+<script src="coach.js?v=1.8.0"></script>
+<script src="gamify.js?v=1.8.0"></script>
+<script src="tips.js?v=1.8.0"></script>
+<script src="avatar.js?v=1.8.0"></script>
+<script src="charts.js?v=1.8.0"></script>
+<script src="fx.js?v=1.8.0"></script>
+<script src="services.js?v=1.8.0"></script>
+<script src="photomaya.js?v=1.8.0"></script>
+<script src="app.js?v=1.8.0"></script>
 </body>
 </html>
