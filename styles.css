@@ -335,3 +335,9 @@ body.desk .maya-box.big.pmaya{max-width:380px}
 table.usage{width:100%;border-collapse:collapse;font-size:15px;margin:6px 0}
 table.usage th,table.usage td{text-align:right;padding:3px 4px;border-bottom:1px dashed #cfc4b0}
 table.usage th:first-child,table.usage td:first-child{text-align:left}
+
+/* workout rows */
+.ex-row{display:grid;grid-template-columns:1fr 58px 26px 96px 28px;gap:6px;align-items:center;margin:6px 0}
+.ex-row select,.ex-row input{min-width:0;padding:6px;font-size:15px}
+.x-unit{font-size:14px;opacity:.7}
+.ex-row .x-del{background:none;border:none;box-shadow:none;color:#a33;padding:0}

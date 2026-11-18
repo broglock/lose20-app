@@ -268,11 +268,13 @@
     const tw = Coach.live(state.weights).find(w => w.date === d);
     $('wInput').placeholder = tw ? tw.lb + ' lb today' : 'lb';
     $('wHint').textContent = tw ? '✓ Weighed in today.' : 'Morning, after the bathroom, before food.';
-    $('gymLabel').textContent = A.isGymDay ? 'Gym day' : 'Workout';
-    $('gymText').textContent = A.isGymDay ? 'Weights + 5k done' : 'Did a workout anyway';
-    $('gymDone').checked = A.gymDoneToday;
-    $('exList').innerHTML = A.exerciseToday.map(w => { const E = Coach.EXERCISE[w.type] || Coach.EXERCISE.other;
-      return `<li data-id="${w.id}">${E.icon} ${E.name} ${w.minutes} min, ${w.intensity} <small>~${w.kcal} kcal</small><button class="del" title="Delete">✕</button></li>`; }).join('') +
+    const planned = Coach.plannedIds(state, d), sessions = new Set(Coach.live(state.workouts).filter(w => w.done !== false && Coach.isRoutine(w) && w.date >= Coach.addDays(d, -((new Date(d + 'T12:00').getDay() + 6) % 7))).map(w => w.date)).size;
+    $('woTitle').textContent = A.isGymDay ? 'Gym day: weights + 5k' : 'Workout';
+    $('woSub').textContent = (A.gymDoneToday ? 'Done today. ' : A.isGymDay ? 'Planned for today. ' : '') + `${Math.min(sessions, 3)} of 3 planned sessions this week.` +
+      (A.exerciseToday.length ? '' : ' Anything you do beyond the plan adds calories back.');
+    $('woQuick').hidden = A.gymDoneToday;
+    $('exList').innerHTML = A.exerciseToday.map(w => { const E = exName(w);
+      return `<li data-id="${w.id}">${E.icon} ${E.name}${w.minutes ? ` ${w.minutes} min, ${w.intensity}` : ''} <small>${w.kcal ? '~' + w.kcal + ' kcal' : ''}${planned.has(w.id) || Coach.isLegacy(w) ? ' · planned' : ''}</small><button class="del" title="Delete">✕</button></li>`; }).join('') +
       (A.exerciseBonus ? `<li class="bonus">+${A.exerciseBonus} kcal added to today</li>` : '');
 
     // idea
@@ -333,37 +335,46 @@
     const dir = prevTrend == null ? 'flat' : A.nowLb < prevTrend - 0.05 ? 'down' : A.nowLb > prevTrend + 0.05 ? 'up' : 'flat';
     say(Tips.pick(Tips.WEIGH_REACT[dir], d + lb), { pose: dir === 'down' ? 'cheer' : dir === 'up' ? 'hips' : 'thumbs', mood: dir === 'down' ? 'cheer' : dir === 'up' ? 'determined' : 'happy' });
   };
-  $('gymDone').onchange = e => {
-    const before = Gamify.dayPoints(state, today()).total, d = today();
-    const w = state.workouts.find(x => x.date === d && !x.deleted);
-    if (w) { w.done = e.target.checked; w.updatedAt = Date.now(); }
-    else state.workouts.push({ id: uid(), date: d, type: state.profile.gymRoutine.join('+'), done: e.target.checked, updatedAt: Date.now() });
+  // ---------- workouts ----------
+  const exName = w => Coach.isLegacy(w) ? { icon: '🏋️', name: 'Weights + 5k' } : (Coach.EXERCISE[w.type] || Coach.EXERCISE.other);
+  function logExercises(list, d) {
+    const before = Gamify.dayPoints(state, today()).total, bonusBefore = Coach.exerciseBonus(state, d), now = Date.now();
+    list.forEach((x, i) => state.workouts.push({ id: uid(), date: d, type: x.type, extra: true, minutes: x.minutes, intensity: x.intensity,
+      kcal: Coach.exerciseKcal(x.type, x.minutes, x.intensity, A.nowLb), done: true, updatedAt: now + i }));
     saveState(); refresh(); awardPoints(before);
-    if (e.target.checked) { FX.confetti(90); say('Workout done! That is what keeps the weight you lose from being muscle. Get 30 grams of protein in.', { pose: 'flex', mood: 'determined' }); }
-  };
-
-  // ---------- other exercise ----------
-  let exType = 'walk', exInt = 'moderate';
-  $('exTypes').innerHTML = Object.entries(Coach.EXERCISE).map(([k, e]) => `<button data-t="${k}">${e.icon} ${e.name}</button>`).join('');
-  function exUpdate() {
-    $('exTypes').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === exType));
-    $('exInt').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === exInt));
-    const kc = Coach.exerciseKcal(exType, +$('exMin').value || 0, exInt, A.nowLb);
-    $('exEst').textContent = `About ${kc} kcal burned. Adds ${Math.round(kc * 0.5 / 10) * 10} kcal to that day's budget.`;
+    const added = Coach.exerciseBonus(state, d) - bonusBefore;
+    FX.confetti(90);
+    say(`Workout logged. ${added > 0 && d === today() ? `I added ${added} calories to today's budget. Spend them on protein.` : 'That is what keeps the weight you lose from being muscle. Get 30 grams of protein in.'}`, { pose: 'flex', mood: 'determined' });
   }
-  $('exBtn').onclick = () => { $('exDate').value = today(); exUpdate(); $('exModal').hidden = false; };
-  $('exTypes').onclick = e => { const b = e.target.closest('button'); if (b) { exType = b.dataset.t; exUpdate(); } };
-  $('exInt').onclick = e => { const b = e.target.closest('button'); if (b) { exInt = b.dataset.v; exUpdate(); } };
-  $('exMin').oninput = exUpdate;
+  $('woQuick').onclick = () => logExercises([{ type: 'weights', minutes: 45, intensity: 'moderate' }, { type: 'run', minutes: 30, intensity: 'moderate' }], today());
+  let exRows = [];
+  function renderExRows() {
+    $('exRows').innerHTML = exRows.map((r, k) => `<div class="ex-row" data-k="${k}">
+      <select class="x-type">${Object.entries(Coach.EXERCISE).map(([t, e]) => `<option value="${t}"${t === r.type ? ' selected' : ''}>${e.icon} ${e.name}</option>`).join('')}</select>
+      <input class="x-min" type="number" inputmode="numeric" value="${r.minutes}" title="Minutes"><span class="x-unit">min</span>
+      <select class="x-int">${Coach.INTENSITY.map(i => `<option${i === r.intensity ? ' selected' : ''}>${i}</option>`).join('')}</select>
+      <button class="x-del" title="Remove">✕</button></div>`).join('');
+    const tot = exRows.reduce((a, r) => a + Coach.exerciseKcal(r.type, +r.minutes || 0, r.intensity, A.nowLb), 0);
+    $('exEst').textContent = exRows.length ? `About ${tot} kcal burned in total.` : 'Add at least one exercise.';
+  }
+  $('exBtn').onclick = () => {
+    exRows = A.isGymDay && !A.gymDoneToday ? [{ type: 'weights', minutes: 45, intensity: 'moderate' }, { type: 'run', minutes: 30, intensity: 'moderate' }] : [{ type: 'walk', minutes: 30, intensity: 'moderate' }];
+    $('exDate').value = today(); renderExRows(); $('exModal').hidden = false;
+  };
+  $('exAddRow').onclick = () => { exRows.push({ type: 'walk', minutes: 20, intensity: 'moderate' }); renderExRows(); };
+  $('exRows').addEventListener('change', e => {
+    const row = e.target.closest('.ex-row'); if (!row) return; const r = exRows[+row.dataset.k];
+    if (e.target.classList.contains('x-type')) r.type = e.target.value;
+    if (e.target.classList.contains('x-min')) r.minutes = +e.target.value || 0;
+    if (e.target.classList.contains('x-int')) r.intensity = e.target.value;
+    renderExRows();
+  });
+  $('exRows').addEventListener('click', e => { if (e.target.classList.contains('x-del')) { exRows.splice(+e.target.closest('.ex-row').dataset.k, 1); renderExRows(); } });
   $('exCancel').onclick = () => { $('exModal').hidden = true; };
   $('exSave').onclick = () => {
-    const minutes = +$('exMin').value || 0; if (minutes < 1) return toast('Enter the minutes');
-    const before = Gamify.dayPoints(state, today()).total, d = $('exDate').value || today();
-    const kcal = Coach.exerciseKcal(exType, minutes, exInt, A.nowLb);
-    state.workouts.push({ id: uid(), date: d, type: exType, extra: true, minutes, intensity: exInt, kcal, done: true, updatedAt: Date.now() });
-    $('exModal').hidden = true; saveState(); refresh(); awardPoints(before);
-    const E = Coach.EXERCISE[exType];
-    say(`${E.name} logged, about ${kcal} calories. ${d === today() ? `I added ${Math.round(kcal * 0.5 / 10) * 10} to today's budget. Spend it on protein, not on a treat.` : 'Nice work.'}`, { pose: 'flex', mood: 'cheer' });
+    const list = exRows.filter(r => r.minutes > 0); if (!list.length) return toast('Add an exercise with minutes');
+    const d = $('exDate').value && $('exDate').value <= today() ? $('exDate').value : today();
+    $('exModal').hidden = true; logExercises(list, d);
   };
   $('exList').onclick = e => {
     if (!e.target.classList.contains('del')) return;
@@ -591,8 +602,8 @@
       const w = Coach.live(state.weights).find(x => x.date === d);
       const wos = Coach.live(state.workouts).filter(x => x.date === d && x.done !== false);
       const rows = (w ? `<div class="panel drow" data-kind="weight" data-id="${w.id}">⚖️ Weigh-in <b>${w.lb} lb</b><span class="edit-hint">✎</span></div>` : '') +
-        wos.map(x => { const E = x.extra ? (Coach.EXERCISE[x.type] || Coach.EXERCISE.other) : { icon: '🏋️', name: 'Weights + 5k' };
-          return `<div class="panel drow" data-kind="${x.extra ? 'exercise' : 'routine'}" data-id="${x.id}">${E.icon} ${E.name}${x.extra ? ` <b>${x.minutes} min</b> ${x.intensity} · ~${x.kcal} kcal` : ' <b>done</b>'}<span class="edit-hint">✎</span></div>`; }).join('');
+        wos.map(x => { const E = exName(x);
+          return `<div class="panel drow" data-kind="${Coach.isLegacy(x) ? 'routine' : 'exercise'}" data-id="${x.id}">${E.icon} ${E.name}${!Coach.isLegacy(x) ? ` <b>${x.minutes} min</b> ${x.intensity} · ~${x.kcal} kcal` : ' <b>done</b>'}<span class="edit-hint">✎</span></div>`; }).join('');
       return `<div class="day-head">${label}<small>${Math.round(t.kcal)} kcal · ${Math.round(t.protein)} g protein ${meals.length ? (t.kcal > T.kcal + bonus + 100 ? '· ✕ over' : '· ✓ on target') : ''}</small></div>` + rows +
         meals.map(m => {
           const light = Coach.mealLight(m, T.kcal);
@@ -745,7 +756,7 @@
         <div class="grid2f">${fld('Minutes', 'eMin', o.minutes || 30, 'number')}${fld('Date', 'eDate', o.date || today(), 'date')}</div>
         <label>Intensity<select id="eInt">${Coach.INTENSITY.map(i => `<option${i === (o.intensity || 'moderate') ? ' selected' : ''}>${i}</option>`).join('')}</select></label><p class="ex-est" id="eEst"></p>`;
     } else {
-      $('editTitle').textContent = 'Weights + 5k';
+      $('editTitle').textContent = 'Weights + 5k (old entry)';
       html = `${fld('Date', 'eDate', o.date || today(), 'date')}<p class="hint">Delete this if you didn't do the workout that day.</p>`;
     }
     $('editBody').innerHTML = html;
@@ -859,9 +870,9 @@
         health_score: { type: 'number', description: '1-10 for a 60-year-old losing weight while lifting' }, light: { type: 'string', enum: ['green', 'yellow', 'red'] } } } },
     { name: 'log_weight', description: 'Record a weigh-in in lb (replaces that day\'s weigh-in).',
       input_schema: { type: 'object', required: ['lb'], properties: { lb: { type: 'number' }, date: { type: 'string' } } } },
-    { name: 'log_exercise', description: 'Record exercise other than his planned weights + 5k routine. Calories are calculated by the app.',
+    { name: 'log_exercise', description: 'Record one exercise (call once per exercise: weights, run, walk, bike...). Calories are calculated by the app. The first weights and run on up to 3 days a week count as his planned routine (already in the calorie target); anything beyond adds half its burn to the budget.',
       input_schema: { type: 'object', required: ['type', 'minutes'], properties: { type: { type: 'string', enum: EX_TYPES }, minutes: { type: 'number' }, intensity: { type: 'string', enum: Coach.INTENSITY }, date: { type: 'string' } } } },
-    { name: 'set_gym_done', description: 'Mark his planned weights + 5k routine done (or not done) for a day.',
+    { name: 'set_gym_done', description: 'Shortcut: log his usual weights (45 min) + 5k run (30 min) for a day, or remove that day\'s weights and run with done=false.',
       input_schema: { type: 'object', properties: { done: { type: 'boolean' }, date: { type: 'string' } } } },
     { name: 'list_entries', description: 'List meals, weigh-in and exercise for a day, with ids, so you can change or delete them.',
       input_schema: { type: 'object', required: ['date'], properties: { date: { type: 'string' } } } },
@@ -883,7 +894,7 @@
       meals: Coach.live(state.meals).filter(m => m.date === d).map(m => ({ id: m.id, time: m.time, name: m.name, kcal: r0(m.kcal), protein_g: r0(m.protein) })),
       weigh_in: (Coach.live(state.weights).find(w => w.date === d) || {}).lb || null,
       weigh_in_id: (Coach.live(state.weights).find(w => w.date === d) || {}).id || null,
-      exercise: Coach.live(state.workouts).filter(w => w.date === d && w.done !== false).map(w => w.extra ? { id: w.id, type: w.type, minutes: w.minutes, intensity: w.intensity, kcal: w.kcal } : { id: w.id, type: 'planned weights + 5k' })
+      exercise: Coach.exercisesOn(state, d).map(w => Coach.isLegacy(w) ? { id: w.id, type: 'weights + 5k (old entry)' } : { id: w.id, type: w.type, minutes: w.minutes, intensity: w.intensity, kcal: w.kcal })
     };
   }
   const restore = obj => () => { obj.deleted = false; obj.updatedAt = Date.now(); };
@@ -911,14 +922,17 @@
       const kcal = Coach.exerciseKcal(type, minutes, intensity, A.nowLb);
       const w = { id: uid(), date: okDate(x.date), type, extra: true, minutes, intensity, kcal, done: true, updatedAt: now };
       state.workouts.push(w);
-      return { result: { ok: true, id: w.id, kcal_burned: kcal, kcal_added_to_budget: Math.round(kcal * 0.5 / 10) * 10 }, action: { text: `${Coach.EXERCISE[type].icon} ${Coach.EXERCISE[type].name} ${minutes} min, ~${kcal} kcal`, undo: remove(w) } };
+      return { result: { ok: true, id: w.id, kcal_burned: kcal, budget_bonus_today_now: Coach.exerciseBonus(state, w.date) }, action: { text: `${Coach.EXERCISE[type].icon} ${Coach.EXERCISE[type].name} ${minutes} min, ~${kcal} kcal`, undo: remove(w) } };
     }
     if (name === 'set_gym_done') {
-      const d = okDate(x.date), done = x.done !== false;
-      let w = state.workouts.find(v => v.date === d && !v.extra && !v.deleted);
-      const prev = w ? w.done : null;
-      if (w) { w.done = done; w.updatedAt = now; } else { w = { id: uid(), date: d, type: state.profile.gymRoutine.join('+'), done, updatedAt: now }; state.workouts.push(w); }
-      return { result: { ok: true }, action: { text: done ? '🏋️ Weights + 5k done' : '🏋️ Workout unmarked', undo: () => { if (prev == null) w.deleted = true; else w.done = prev; w.updatedAt = Date.now(); } } };
+      const d = okDate(x.date);
+      if (x.done === false) {
+        const gone = Coach.exercisesOn(state, d).filter(Coach.isRoutine); gone.forEach(w => { w.deleted = true; w.updatedAt = now; });
+        return { result: { ok: true, removed: gone.length }, action: { text: '🏋️ Weights + 5k removed', undo: () => gone.forEach(w => { w.deleted = false; w.updatedAt = Date.now(); }) } };
+      }
+      const made = [['weights', 45], ['run', 30]].map(([type, minutes], i) => ({ id: uid(), date: d, type, extra: true, minutes, intensity: 'moderate', kcal: Coach.exerciseKcal(type, minutes, 'moderate', A.nowLb), done: true, updatedAt: now + i }));
+      made.forEach(w => state.workouts.push(w));
+      return { result: { ok: true }, action: { text: '🏋️ Weights 45 min + 🏃 run 30 min', undo: () => made.forEach(w => { w.deleted = true; w.updatedAt = Date.now(); }) } };
     }
     if (name === 'update_meal') {
       const m = state.meals.find(v => v.id === x.id && !v.deleted); if (!m) throw new Error('No meal with that id. Use list_entries first.');
@@ -948,7 +962,7 @@
 You can change his log with tools. When he tells you what he ate, what he weighed, or what exercise he did, or asks to fix or remove an entry, call the tools. Never claim you logged something without calling a tool.
 For food described in words, estimate calories, protein, carbs, fat and fiber yourself (round calories to 10), split it into items, and pick a traffic light (green = lean and filling, red = calorie-dense or sugary).
 "Yesterday" and similar mean the matching date. For entries on other days, call list_entries first to get ids.
-His planned weights + 5k uses set_gym_done; anything else is log_exercise.
+"Gym done" or "did my usual workout" means set_gym_done; otherwise call log_exercise once per exercise he names.
 After the tools, confirm in one short spoken sentence what you did with the calories, then one short coaching line. If something is unclear (for example the portion), make a sensible guess and say what you assumed.`;
   }
 

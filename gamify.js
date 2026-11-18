@@ -17,7 +17,7 @@
 
   function tgt(state, today) { return C.targets(state.profile, C.currentWeight(state, today)); }
   function weighSet(state) { return new Set(C.live(state.weights).map(w => w.date)); }
-  function gymDone(state, d) { return C.live(state.workouts).some(w => w.date === d && !w.extra && w.done !== false); }
+  function gymDone(state, d) { return C.gymSession(state, d); }
 
   // Points earned on one day, itemised.
   function dayPoints(state, d, T) {
@@ -164,7 +164,7 @@
       photoMeals: meals.filter(m => m.source === 'photo').length,
       greenMeals: meals.filter(m => C.mealLight(m, T.kcal) === 'green').length,
       weighins: ws.size,
-      gym: C.live(state.workouts).filter(w => !w.extra && w.done !== false).length,
+      gym: new Set(C.live(state.workouts).filter(w => w.done !== false && C.isRoutine(w)).map(w => w.date)).size,
       plansKept: C.live(state.planChecks || []).filter(x => x.kept).length,
       lost: Math.max(0, p.startWeight - C.currentWeight(state, today)),
       best: {

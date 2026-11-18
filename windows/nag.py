@@ -131,7 +131,7 @@ def summarize(state, now):
     logged = [d for d in logged if d["meals"]]
     js_dow = (today.weekday() + 1) % 7          # JS getDay(): Sunday = 0
     gym_day = js_dow in p.get("gymDays", [1, 3, 5])
-    gym_done = any(w["date"] == today.isoformat() and w.get("done", True) and not w.get("extra") for w in live(state["workouts"]))
+    gym_done = any(w["date"] == today.isoformat() and w.get("done", True) and (w.get("type") in ("weights", "run") or not w.get("extra")) for w in live(state["workouts"]))
     avg_protein = round(sum(d["protein"] for d in logged) / len(logged)) if logged else None
     return {
         "name": p.get("name", "David"), "coach": p.get("coachName", "Maya"), "coach_voice": p.get("coachVoice"),

@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/maya-a-icon-192.png">
 <link rel="preload" href="fonts/caveat-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/patrick-hand-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="styles.css?v=1.8.1">
+<link rel="stylesheet" href="styles.css?v=1.9.0">
 </head>
 <body>
 <header class="top">
@@ -73,18 +73,18 @@
       </div>
     </div>
 
-    <div class="panel row-card">
-      <div>
-        <span class="label">Weigh-in</span>
-        <div class="inline"><input id="wInput" type="number" step="0.1" inputmode="decimal" placeholder="lb"><button id="wSave">Save</button></div>
-        <small id="wHint">Morning, after the bathroom, before food.</small>
-      </div>
-      <div>
-        <span class="label" id="gymLabel">Workout</span>
-        <label class="check"><input type="checkbox" id="gymDone"> <span id="gymText">Weights + 5k done</span></label>
-        <button class="small" id="exBtn">+ Log other exercise</button>
-        <ul id="exList" class="ex-list"></ul>
-      </div>
+    <div class="panel">
+      <span class="label">Weigh-in</span>
+      <div class="inline"><input id="wInput" type="number" step="0.1" inputmode="decimal" placeholder="lb"><button id="wSave">Save</button></div>
+      <small id="wHint">Morning, after the bathroom, before food.</small>
+    </div>
+
+    <div class="panel" id="workoutPanel">
+      <span class="doodle">🏋️</span>
+      <h3 id="woTitle">Workout</h3>
+      <p class="sub" id="woSub"></p>
+      <ul id="exList" class="ex-list"></ul>
+      <div class="inline" style="flex-wrap:wrap;gap:8px"><button class="primary" id="woQuick">✓ Weights + 5k done</button><button id="exBtn">+ Log a workout</button></div>
     </div>
 
     <div class="panel mint">
@@ -328,16 +328,13 @@
 
 <div class="modal" id="exModal" hidden>
   <div class="panel butter">
-    <h3>Log exercise</h3>
-    <p class="sub">Your planned weights + 5k is already counted in your calories, so use the checkbox for that. Log anything extra here: your coach adds back half of what it burns to today's budget.</p>
-    <div id="exTypes" class="ex-types"></div>
-    <div class="grid2f">
-      <label>Minutes<input id="exMin" type="number" inputmode="numeric" min="5" max="300" value="30"></label>
-      <label>Date<input id="exDate" type="date"></label>
-    </div>
-    <div class="seg" id="exInt"><button data-v="easy">Easy</button><button data-v="moderate" class="on">Moderate</button><button data-v="hard">Hard</button></div>
+    <h3>Log a workout</h3>
+    <p class="sub">Add every exercise you did, for example weights, then a run, then a stretch.</p>
+    <div id="exRows"></div>
+    <button class="small" id="exAddRow">+ Add another exercise</button>
+    <label>Date<input id="exDate" type="date"></label>
     <p id="exEst" class="ex-est"></p>
-    <div class="inline"><button class="primary" id="exSave">Save</button><button id="exCancel">Cancel</button></div>
+    <div class="inline"><button class="primary" id="exSave">Save workout</button><button id="exCancel">Cancel</button></div>
   </div>
 </div>
 
@@ -351,15 +348,15 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="version.js?v=1.8.1"></script>
-<script src="coach.js?v=1.8.1"></script>
-<script src="gamify.js?v=1.8.1"></script>
-<script src="tips.js?v=1.8.1"></script>
-<script src="avatar.js?v=1.8.1"></script>
-<script src="charts.js?v=1.8.1"></script>
-<script src="fx.js?v=1.8.1"></script>
-<script src="services.js?v=1.8.1"></script>
-<script src="photomaya.js?v=1.8.1"></script>
-<script src="app.js?v=1.8.1"></script>
+<script src="version.js?v=1.9.0"></script>
+<script src="coach.js?v=1.9.0"></script>
+<script src="gamify.js?v=1.9.0"></script>
+<script src="tips.js?v=1.9.0"></script>
+<script src="avatar.js?v=1.9.0"></script>
+<script src="charts.js?v=1.9.0"></script>
+<script src="fx.js?v=1.9.0"></script>
+<script src="services.js?v=1.9.0"></script>
+<script src="photomaya.js?v=1.9.0"></script>
+<script src="app.js?v=1.9.0"></script>
 </body>
 </html>
