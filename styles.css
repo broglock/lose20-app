@@ -280,3 +280,8 @@ body.desk .maya-box.big.pmaya{max-width:380px}
 .seg{display:flex;gap:6px;margin:8px 0}
 .seg button{flex:1}
 .ex-est{font-weight:700;margin:6px 0}
+
+/* actions Maya took from chat */
+.msg.actions{background:none;border:none;box-shadow:none;padding:0;max-width:96%}
+.act-row{display:flex;align-items:center;gap:8px;justify-content:space-between;background:#e6f6ea;border:2px solid var(--ink);border-radius:12px;padding:4px 8px;margin:4px 0;font-size:15px}
+.act-row.undone{background:#eee;opacity:.7}

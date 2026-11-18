@@ -26,6 +26,18 @@ Return ONLY a JSON object with the same fields as: {"name","items":[{"food","por
     return JSON.parse(text.slice(a, b + 1));
   }
 
+  async function claudeRaw(settings, body) {
+    if (!settings.anthropicKey) throw new Error('Add your Claude API key in Settings.');
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': settings.anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify(Object.assign({ model: settings.model || 'claude-sonnet-5-5', max_tokens: 4000 }, body))
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error((j.error && j.error.message) || ('Claude API error ' + r.status));
+    return j;
+  }
+
   async function claude(settings, messages, system, maxTokens) {
     if (!settings.anthropicKey) throw new Error('Add your Claude API key in Settings.');
     const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -74,6 +86,34 @@ ${summary}`;
     const msgs = history.slice(-12);
     while (msgs.length && msgs[0].role !== 'user') msgs.shift();   // API needs a user turn first
     return claude(settings, msgs, coachSystem(profile, summary, desk), 2000);
+  }
+
+  // Chat with tools: Maya can add, change and delete log entries when asked.
+  // exec(name, input) runs a tool in the app and returns a result object.
+  async function coachAct(settings, profile, summary, history, desk, tools, exec, context) {
+    const msgs = history.slice(-12).map(m => ({ role: m.role, content: m.content }));
+    while (msgs.length && msgs[0].role !== 'user') msgs.shift();
+    const system = coachSystem(profile, summary, desk) + '\n\n' + context;
+    const actions = [];
+    for (let turn = 0; turn < 6; turn++) {
+      const j = await claudeRaw(settings, { system, messages: msgs, tools, max_tokens: 3000 });
+      const uses = j.content.filter(c => c.type === 'tool_use');
+      if (j.stop_reason !== 'tool_use' || !uses.length) {
+        const text = j.content.filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+        if (!text && !actions.length) throw new Error('Claude returned no text (stop reason: ' + j.stop_reason + '). Try again.');
+        return { text: text || 'Done.', actions };
+      }
+      msgs.push({ role: 'assistant', content: j.content.filter(c => !(c.type === 'text' && !c.text.trim())) });
+      const results = [];
+      for (const u of uses) {
+        let out;
+        try { out = await exec(u.name, u.input || {}); if (out && out.action) actions.push(out.action); }
+        catch (e) { out = { error: e.message }; }
+        results.push({ type: 'tool_result', tool_use_id: u.id, content: JSON.stringify(out && out.result !== undefined ? out.result : out) });
+      }
+      msgs.push({ role: 'user', content: results });
+    }
+    return { text: 'Done.', actions };
   }
 
   // ---------------- Voice (Azure neural) ----------------
@@ -208,5 +248,5 @@ ${summary}`;
     });
   }
 
-  root.Services = { analyzeMealPhoto, analyzeMealText, coachReply, speak, stopSpeaking, onSpeaking, isSpeaking, listen, sync, ghPull, putThumb, getThumb, resizeImage };
+  root.Services = { analyzeMealPhoto, analyzeMealText, coachReply, coachAct, speak, stopSpeaking, onSpeaking, isSpeaking, listen, sync, ghPull, putThumb, getThumb, resizeImage };
 })(self);

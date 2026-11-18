@@ -567,16 +567,127 @@
     return `\nStreaks: logging ${ST.logging.days} days, weigh-in ${ST.weighin.days}. Weekly points bank ${B.bank}/200. Level ${X.level} ${X.name}.` +
       (plans.length ? `\nHis if-then plans: ${plans.join(' | ')}` : '') + (Gamify.slip(state, d).slipping ? '\nHe has been slipping (missed days). Be warm, no guilt, ask for one small action.' : '');
   }
+  // ---------- Maya can log for you ----------
+  const EX_TYPES = Object.keys(Coach.EXERCISE);
+  const TOOLS = [
+    { name: 'log_meal', description: 'Add a meal or snack he ate. Estimate calories and macros yourself when he describes food in words.',
+      input_schema: { type: 'object', required: ['name', 'kcal', 'protein_g'], properties: {
+        name: { type: 'string' }, date: { type: 'string', description: 'YYYY-MM-DD, default today' }, time: { type: 'string', description: 'HH:MM 24h, default now' },
+        items: { type: 'array', items: { type: 'object', properties: { food: { type: 'string' }, portion: { type: 'string' }, kcal: { type: 'number' }, color: { type: 'string', enum: ['green', 'yellow', 'red'] } } } },
+        kcal: { type: 'number' }, protein_g: { type: 'number' }, carbs_g: { type: 'number' }, fat_g: { type: 'number' }, fiber_g: { type: 'number' },
+        health_score: { type: 'number', description: '1-10 for a 60-year-old losing weight while lifting' }, light: { type: 'string', enum: ['green', 'yellow', 'red'] } } } },
+    { name: 'log_weight', description: 'Record a weigh-in in lb (replaces that day\'s weigh-in).',
+      input_schema: { type: 'object', required: ['lb'], properties: { lb: { type: 'number' }, date: { type: 'string' } } } },
+    { name: 'log_exercise', description: 'Record exercise other than his planned weights + 5k routine. Calories are calculated by the app.',
+      input_schema: { type: 'object', required: ['type', 'minutes'], properties: { type: { type: 'string', enum: EX_TYPES }, minutes: { type: 'number' }, intensity: { type: 'string', enum: Coach.INTENSITY }, date: { type: 'string' } } } },
+    { name: 'set_gym_done', description: 'Mark his planned weights + 5k routine done (or not done) for a day.',
+      input_schema: { type: 'object', properties: { done: { type: 'boolean' }, date: { type: 'string' } } } },
+    { name: 'list_entries', description: 'List meals, weigh-in and exercise for a day, with ids, so you can change or delete them.',
+      input_schema: { type: 'object', required: ['date'], properties: { date: { type: 'string' } } } },
+    { name: 'update_meal', description: 'Change a logged meal. Only pass the fields to change.',
+      input_schema: { type: 'object', required: ['id'], properties: { id: { type: 'string' }, name: { type: 'string' }, date: { type: 'string' }, time: { type: 'string' },
+        kcal: { type: 'number' }, protein_g: { type: 'number' }, carbs_g: { type: 'number' }, fat_g: { type: 'number' }, fiber_g: { type: 'number' },
+        items: { type: 'array', items: { type: 'object', properties: { food: { type: 'string' }, portion: { type: 'string' }, kcal: { type: 'number' } } } } } } },
+    { name: 'delete_entry', description: 'Delete a meal, weigh-in or exercise entry by id.',
+      input_schema: { type: 'object', required: ['kind', 'id'], properties: { kind: { type: 'string', enum: ['meal', 'weight', 'exercise'] }, id: { type: 'string' } } } }
+  ];
+  const okDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '') && d <= today() ? d : today();
+  const okTime = t => /^\d{1,2}:\d{2}$/.test(t || '') ? t.padStart(5, '0') : nowTime();
+  const r0 = n => Math.round(+n || 0);
+  function dayEntries(d) {
+    return {
+      date: d,
+      meals: Coach.live(state.meals).filter(m => m.date === d).map(m => ({ id: m.id, time: m.time, name: m.name, kcal: r0(m.kcal), protein_g: r0(m.protein) })),
+      weigh_in: (Coach.live(state.weights).find(w => w.date === d) || {}).lb || null,
+      weigh_in_id: (Coach.live(state.weights).find(w => w.date === d) || {}).id || null,
+      exercise: Coach.live(state.workouts).filter(w => w.date === d && w.done !== false).map(w => w.extra ? { id: w.id, type: w.type, minutes: w.minutes, intensity: w.intensity, kcal: w.kcal } : { id: w.id, type: 'planned weights + 5k' })
+    };
+  }
+  const restore = obj => () => { obj.deleted = false; obj.updatedAt = Date.now(); };
+  const remove = obj => () => { obj.deleted = true; obj.updatedAt = Date.now(); };
+  function runTool(name, x) {
+    const now = Date.now();
+    if (name === 'list_entries') return { result: dayEntries(okDate(x.date)) };
+    if (name === 'log_meal') {
+      const items = (x.items || []).map(i => ({ food: String(i.food || ''), portion: String(i.portion || ''), kcal: r0(i.kcal), color: i.color || 'yellow' }));
+      const m = { id: uid(), date: okDate(x.date), time: okTime(x.time), name: String(x.name || 'Meal'), kcal: r0(x.kcal), protein: r0(x.protein_g), carbs: r0(x.carbs_g), fat: r0(x.fat_g),
+        fiber: r0(x.fiber_g), score: x.health_score ? r0(x.health_score) : null, light: x.light || null, verdict: '', tip: '', items, source: 'chat', updatedAt: now };
+      state.meals.push(m);
+      return { result: { ok: true, id: m.id }, action: { text: `🍽 ${m.name}, ${m.kcal} kcal, ${m.protein} g protein${m.date !== today() ? ' (' + m.date + ')' : ''}`, undo: remove(m) } };
+    }
+    if (name === 'log_weight') {
+      const lb = +x.lb; if (!(lb > 80 && lb < 400)) throw new Error('Weight must be in lb');
+      const d = okDate(x.date), w = state.weights.find(v => v.date === d && !v.deleted);
+      if (w) { const old = w.lb; w.lb = lb; w.updatedAt = now; return { result: { ok: true, replaced: old }, action: { text: `⚖️ ${lb} lb (was ${old})`, undo: () => { w.lb = old; w.updatedAt = Date.now(); } } }; }
+      const nw = { id: uid(), date: d, lb, updatedAt: now }; state.weights.push(nw);
+      return { result: { ok: true }, action: { text: `⚖️ Weigh-in ${lb} lb${d !== today() ? ' (' + d + ')' : ''}`, undo: remove(nw) } };
+    }
+    if (name === 'log_exercise') {
+      const type = EX_TYPES.includes(x.type) ? x.type : 'other', minutes = r0(x.minutes), intensity = Coach.INTENSITY.includes(x.intensity) ? x.intensity : 'moderate';
+      if (minutes < 1) throw new Error('Minutes missing');
+      const kcal = Coach.exerciseKcal(type, minutes, intensity, A.nowLb);
+      const w = { id: uid(), date: okDate(x.date), type, extra: true, minutes, intensity, kcal, done: true, updatedAt: now };
+      state.workouts.push(w);
+      return { result: { ok: true, id: w.id, kcal_burned: kcal, kcal_added_to_budget: Math.round(kcal * 0.5 / 10) * 10 }, action: { text: `${Coach.EXERCISE[type].icon} ${Coach.EXERCISE[type].name} ${minutes} min, ~${kcal} kcal`, undo: remove(w) } };
+    }
+    if (name === 'set_gym_done') {
+      const d = okDate(x.date), done = x.done !== false;
+      let w = state.workouts.find(v => v.date === d && !v.extra && !v.deleted);
+      const prev = w ? w.done : null;
+      if (w) { w.done = done; w.updatedAt = now; } else { w = { id: uid(), date: d, type: state.profile.gymRoutine.join('+'), done, updatedAt: now }; state.workouts.push(w); }
+      return { result: { ok: true }, action: { text: done ? '🏋️ Weights + 5k done' : '🏋️ Workout unmarked', undo: () => { if (prev == null) w.deleted = true; else w.done = prev; w.updatedAt = Date.now(); } } };
+    }
+    if (name === 'update_meal') {
+      const m = state.meals.find(v => v.id === x.id && !v.deleted); if (!m) throw new Error('No meal with that id. Use list_entries first.');
+      const before = JSON.parse(JSON.stringify(m));
+      const map = { name: 'name', kcal: 'kcal', protein_g: 'protein', carbs_g: 'carbs', fat_g: 'fat', fiber_g: 'fiber' };
+      Object.entries(map).forEach(([k, f]) => { if (x[k] !== undefined) m[f] = k === 'name' ? String(x[k]) : r0(x[k]); });
+      if (x.date) m.date = okDate(x.date); if (x.time) m.time = okTime(x.time);
+      if (Array.isArray(x.items)) m.items = x.items.map(i => ({ food: String(i.food || ''), portion: String(i.portion || ''), kcal: r0(i.kcal), color: i.color || 'yellow' }));
+      m.updatedAt = now;
+      return { result: { ok: true }, action: { text: `✏️ ${m.name} now ${m.kcal} kcal, ${m.protein} g protein`, undo: () => { Object.assign(m, before, { updatedAt: Date.now() }); } } };
+    }
+    if (name === 'delete_entry') {
+      const list = x.kind === 'meal' ? state.meals : x.kind === 'weight' ? state.weights : state.workouts;
+      const o = list.find(v => v.id === x.id && !v.deleted); if (!o) throw new Error('Nothing with that id. Use list_entries first.');
+      o.deleted = true; o.updatedAt = now;
+      return { result: { ok: true }, action: { text: `🗑 Deleted ${x.kind === 'meal' ? o.name : x.kind === 'weight' ? o.lb + ' lb weigh-in' : 'exercise'}`, undo: restore(o) } };
+    }
+    throw new Error('Unknown tool ' + name);
+  }
+  function toolContext() {
+    const d = today(), wd = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    return `It is ${wd} ${d}, ${nowTime()}. Today's entries: ${JSON.stringify(dayEntries(d))}
+You can change his log with tools. When he tells you what he ate, what he weighed, or what exercise he did, or asks to fix or remove an entry, call the tools. Never claim you logged something without calling a tool.
+For food described in words, estimate calories, protein, carbs, fat and fiber yourself (round calories to 10), split it into items, and pick a traffic light (green = lean and filling, red = calorie-dense or sugary).
+"Yesterday" and similar mean the matching date. For entries on other days, call list_entries first to get ids.
+His planned weights + 5k uses set_gym_done; anything else is log_exercise.
+After the tools, confirm in one short spoken sentence what you did with the calories, then one short coaching line. If something is unclear (for example the portion), make a sensible guess and say what you assumed.`;
+  }
+
   async function ask(userText, hidden) {
     if (!hidden) addMsg('me', userText);
     chatHistory.push({ role: 'user', content: userText });
     const typing = addMsg('her', '…', 'typing');
     maya.coach.pose('think');
+    const beforePts = Gamify.dayPoints(state, today()).total;
     try {
-      const reply = await Services.coachReply(settings, state.profile, Coach.summaryText(state, A) + extraSummary(), chatHistory, DESK);
+      const out = await Services.coachAct(settings, state.profile, Coach.summaryText(state, A) + extraSummary(), chatHistory, DESK, TOOLS, async (n, x) => runTool(n, x), toolContext());
+      const reply = out.text;
       chatHistory.push({ role: 'assistant', content: reply });
       typing.classList.remove('typing'); typing.textContent = reply;
-      say(reply, { pose: /great|proud|nice|awesome|love/i.test(reply) ? 'thumbs' : 'idle', bubble: false });
+      if (out.actions.length) {
+        saveState(); refresh(); awardPoints(beforePts);
+        const box = document.createElement('div'); box.className = 'msg actions';
+        out.actions.forEach(a => {
+          const row = document.createElement('div'); row.className = 'act-row';
+          row.innerHTML = `<span>✓ ${esc(a.text)}</span><button class="small">Undo</button>`;
+          row.querySelector('button').onclick = e => { a.undo(); saveState(); refresh(); row.classList.add('undone'); e.target.remove(); row.querySelector('span').textContent = '↶ Undone: ' + a.text; };
+          box.appendChild(row);
+        });
+        $('chat').appendChild(box); box.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+      say(reply, { pose: out.actions.length ? 'thumbs' : /great|proud|nice|awesome|love/i.test(reply) ? 'thumbs' : 'idle', bubble: false });
     } catch (e) {
       chatHistory.pop(); maya.coach.pose('idle');
       typing.classList.remove('typing'); typing.textContent = e.message.includes('API key') ? 'Add your Claude API key in Settings so I can talk with you.' : 'I could not reach Claude: ' + e.message;
