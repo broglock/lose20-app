@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/maya-a-icon-192.png">
 <link rel="preload" href="fonts/caveat-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/patrick-hand-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="styles.css?v=1.4.0">
+<link rel="stylesheet" href="styles.css?v=1.5.0">
 </head>
 <body>
 <header class="top">
@@ -27,10 +27,11 @@
       <div id="mayaHero" class="maya-box" title="Tap Maya"></div>
       <div class="bubble">
         <p id="bubble">…</p>
-        <div class="acts"><button class="small" id="hearBtn">🔊 Hear Maya</button><button class="small" id="tipBtn">Another tip</button></div>
+        <div class="acts"><button class="small voice-btn" id="hearBtn">🔊 Voice on</button><button class="small" id="tipBtn">Another tip</button></div>
       </div>
     </div>
     <p class="tap-hint" id="tapHint">Tap Maya to talk to her</p>
+    <button id="nextBtn" class="next-btn">🧭 What should I do next?</button>
 
     <div class="panel peach" id="comeback" hidden>
       <span class="doodle">💛</span>
@@ -81,6 +82,8 @@
       <div>
         <span class="label" id="gymLabel">Workout</span>
         <label class="check"><input type="checkbox" id="gymDone"> <span id="gymText">Weights + 5k done</span></label>
+        <button class="small" id="exBtn">+ Log other exercise</button>
+        <ul id="exList" class="ex-list"></ul>
       </div>
     </div>
 
@@ -131,7 +134,11 @@
       </div>
       <p id="rVerdict" class="verdict"></p>
       <p id="rSwap" class="swap"></p>
-      <ul id="rItems" class="items"></ul>
+      <div class="items-edit">
+        <div class="items-head"><span>Item</span><span>Amount</span><span>kcal</span><span></span></div>
+        <div id="rItems"></div>
+        <div class="items-acts"><button class="small" id="addItem">+ Add item</button><button class="small" id="recheckBtn" hidden>↻ Re-check with my changes</button></div>
+      </div>
       <div class="grid4">
         <label>kcal<input id="rKcal" type="number"></label>
         <label>Protein<input id="rProt" type="number"></label>
@@ -181,10 +188,11 @@
     <div>
       <div class="panel mint"><div id="mayaCoach" class="maya-box big"></div></div>
       <div class="coach-actions">
+        <button id="nextBtn2" class="next-btn">🧭 What should I do next?</button>
         <button id="pepBtn">💪 Pep talk</button>
         <button id="reviewBtn">📋 Review my day</button>
         <button id="hungryBtn">🍽 I'm hungry, what now?</button>
-        <label class="check"><input type="checkbox" id="voiceOn"> Maya speaks out loud</label>
+        <div class="voice-row"><button class="voice-btn" id="muteBtn">🔊 Voice on</button><button id="stopBtn" class="stop-btn" hidden>⏹ Stop talking</button></div>
       </div>
       <div id="deskSummary"></div>
     </div>
@@ -267,17 +275,32 @@
   </div>
 </div>
 
+<div class="modal" id="exModal" hidden>
+  <div class="panel butter">
+    <h3>Log exercise</h3>
+    <p class="sub">Your planned weights + 5k is already counted in your calories, so use the checkbox for that. Log anything extra here: Maya adds back half of what it burns to today's budget.</p>
+    <div id="exTypes" class="ex-types"></div>
+    <div class="grid2f">
+      <label>Minutes<input id="exMin" type="number" inputmode="numeric" min="5" max="300" value="30"></label>
+      <label>Date<input id="exDate" type="date"></label>
+    </div>
+    <div class="seg" id="exInt"><button data-v="easy">Easy</button><button data-v="moderate" class="on">Moderate</button><button data-v="hard">Hard</button></div>
+    <p id="exEst" class="ex-est"></p>
+    <div class="inline"><button class="primary" id="exSave">Save</button><button id="exCancel">Cancel</button></div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
-<script src="version.js?v=1.4.0"></script>
-<script src="coach.js?v=1.4.0"></script>
-<script src="gamify.js?v=1.4.0"></script>
-<script src="tips.js?v=1.4.0"></script>
-<script src="avatar.js?v=1.4.0"></script>
-<script src="charts.js?v=1.4.0"></script>
-<script src="fx.js?v=1.4.0"></script>
-<script src="services.js?v=1.4.0"></script>
-<script src="photomaya.js?v=1.4.0"></script>
-<script src="app.js?v=1.4.0"></script>
+<script src="version.js?v=1.5.0"></script>
+<script src="coach.js?v=1.5.0"></script>
+<script src="gamify.js?v=1.5.0"></script>
+<script src="tips.js?v=1.5.0"></script>
+<script src="avatar.js?v=1.5.0"></script>
+<script src="charts.js?v=1.5.0"></script>
+<script src="fx.js?v=1.5.0"></script>
+<script src="services.js?v=1.5.0"></script>
+<script src="photomaya.js?v=1.5.0"></script>
+<script src="app.js?v=1.5.0"></script>
 </body>
 </html>

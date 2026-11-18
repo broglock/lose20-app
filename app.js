@@ -65,6 +65,7 @@
     if (opts.mood) mayaMood(opts.mood);
     if (opts.bubble !== false) $('bubble').textContent = text;
     const inst = allMaya();
+    if (opts.force) { speakAudio(text, inst, Object.assign({}, settings, { voiceOn: true })); return; }
     if (liveMode() && settings.voiceOn) {
       Services.stopSpeaking();
       LiveMaya.speak(settings, text, opts.box || activeBox()).then(ok => { if (!ok) speakAudio(text, inst); });
@@ -72,8 +73,8 @@
     }
     speakAudio(text, inst);
   }
-  function speakAudio(text, inst) {
-    Services.speak(settings, text,
+  function speakAudio(text, inst, cfg) {
+    Services.speak(cfg || settings, text,
       () => { if (!inst[0].svg.classList.contains('lipsync')) inst.forEach(i => i.talk(true)); },
       () => inst.forEach(i => i.talk(false)),
       audio => (MayaKind.lipSync || Avatar.lipSync)(audio, inst));
@@ -188,6 +189,9 @@
     $('gymLabel').textContent = A.isGymDay ? 'Gym day' : 'Workout';
     $('gymText').textContent = A.isGymDay ? 'Weights + 5k done' : 'Did a workout anyway';
     $('gymDone').checked = A.gymDoneToday;
+    $('exList').innerHTML = A.exerciseToday.map(w => { const E = Coach.EXERCISE[w.type] || Coach.EXERCISE.other;
+      return `<li data-id="${w.id}">${E.icon} ${E.name} ${w.minutes} min, ${w.intensity} <small>~${w.kcal} kcal</small><button class="del" title="Delete">✕</button></li>`; }).join('') +
+      (A.exerciseBonus ? `<li class="bonus">+${A.exerciseBonus} kcal added to today</li>` : '');
 
     // idea
     const idea = Tips.ideaFor(hourNow(), A.remaining, A.proteinLeft, d + tipSeed);
@@ -255,6 +259,77 @@
     saveState(); refresh(); awardPoints(before);
     if (e.target.checked) { FX.confetti(90); say('Workout done! That is what keeps the weight you lose from being muscle. Get 30 grams of protein in.', { pose: 'flex', mood: 'determined' }); }
   };
+
+  // ---------- other exercise ----------
+  let exType = 'walk', exInt = 'moderate';
+  $('exTypes').innerHTML = Object.entries(Coach.EXERCISE).map(([k, e]) => `<button data-t="${k}">${e.icon} ${e.name}</button>`).join('');
+  function exUpdate() {
+    $('exTypes').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === exType));
+    $('exInt').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === exInt));
+    const kc = Coach.exerciseKcal(exType, +$('exMin').value || 0, exInt, A.nowLb);
+    $('exEst').textContent = `About ${kc} kcal burned. Adds ${Math.round(kc * 0.5 / 10) * 10} kcal to that day's budget.`;
+  }
+  $('exBtn').onclick = () => { $('exDate').value = today(); exUpdate(); $('exModal').hidden = false; };
+  $('exTypes').onclick = e => { const b = e.target.closest('button'); if (b) { exType = b.dataset.t; exUpdate(); } };
+  $('exInt').onclick = e => { const b = e.target.closest('button'); if (b) { exInt = b.dataset.v; exUpdate(); } };
+  $('exMin').oninput = exUpdate;
+  $('exCancel').onclick = () => { $('exModal').hidden = true; };
+  $('exSave').onclick = () => {
+    const minutes = +$('exMin').value || 0; if (minutes < 1) return toast('Enter the minutes');
+    const before = Gamify.dayPoints(state, today()).total, d = $('exDate').value || today();
+    const kcal = Coach.exerciseKcal(exType, minutes, exInt, A.nowLb);
+    state.workouts.push({ id: uid(), date: d, type: exType, extra: true, minutes, intensity: exInt, kcal, done: true, updatedAt: Date.now() });
+    $('exModal').hidden = true; saveState(); refresh(); awardPoints(before);
+    const E = Coach.EXERCISE[exType];
+    say(`${E.name} logged, about ${kcal} calories. ${d === today() ? `I added ${Math.round(kcal * 0.5 / 10) * 10} to today's budget. Spend it on protein, not on a treat.` : 'Nice work.'}`, { pose: 'flex', mood: 'cheer' });
+  };
+  $('exList').onclick = e => {
+    if (!e.target.classList.contains('del')) return;
+    const w = state.workouts.find(x => x.id === e.target.closest('li').dataset.id);
+    if (w) { w.deleted = true; w.updatedAt = Date.now(); saveState(); refresh(); }
+  };
+
+  // ---------- What should I do next? ----------
+  function nextSteps() {
+    const d = today(), h = hourNow(), T = A.targets;
+    const meals = Coach.live(state.meals).filter(m => m.date === d);
+    const plan = Tips.planRest({ hour: h, kcalLeft: A.remaining, proteinLeft: A.proteinLeft, meals });
+    const acts = [];
+    if (!A.weighedToday && h < 11) acts.push('Weigh in now, before you eat.');
+    else if (!A.weighedToday) acts.push('Weigh in first thing tomorrow morning.');
+    if (A.isGymDay && !A.gymDoneToday && h < 20) acts.push('It is a gym day: weights, then the 5k.');
+    if (!meals.length && h >= 10) acts.push('Log what you have eaten so far today, even roughly.');
+    if (A.remaining < 0) acts.push(`You are ${-A.remaining} kcal over. Kitchen closed; a ${Math.round(-A.remaining / Coach.exerciseKcal('walk', 60, 'moderate', A.nowLb) * 60 / 5) * 5}-minute brisk walk would cover it.`);
+    if (plan.items.length) acts.push(`Next meal: ${plan.items[0].name} (${plan.items[0].kcal} kcal, ${plan.items[0].protein} g protein).`);
+    else if (A.remaining >= 0) acts.push(h >= 20 ? 'You are done eating for today. Water or tea if you are peckish.' : 'You are close to your calories. Stick to water, tea or veg until tomorrow.');
+    const endK = Math.round(A.todayTotals.kcal + plan.kcal), endP = Math.round(A.todayTotals.protein + plan.protein);
+    // projection: ideal days vs the last 7 days actually logged
+    const toGo = Math.max(0, A.nowLb - state.profile.goalWeight);
+    const ideal = Tips.projectWeeks(toGo, T.tdee, T.kcal);
+    const days = Coach.lastNDays(d, 8).filter(x => x !== d && x >= state.profile.startDate).map(x => Coach.dayTotals(state, x)).filter(t => t.meals >= 2);
+    const avgK = days.length ? Math.round(days.reduce((a, t) => a + t.kcal, 0) / days.length) : null;
+    const actual = avgK ? Tips.projectWeeks(toGo, T.tdee, avgK) : null;
+    const when = w => w ? new Date(Date.now() + w * 7 * 864e5).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'not at this rate';
+    return { plan, acts, endK, endP, ideal, actual, avgK, toGo, when };
+  }
+  function showNext() {
+    go('maya');
+    const S = nextSteps(), T = A.targets;
+    const card = document.createElement('div'); card.className = 'msg her next-card';
+    card.innerHTML = `<b>Do next</b><ol>${S.acts.map(a => `<li>${esc(a)}</li>`).join('')}</ol>` +
+      (S.plan.items.length ? `<b>Ideal rest of today</b><ul class="sim">${S.plan.items.map(i => `<li><span>${i.slot}</span> ${esc(i.name)} <small>${i.kcal} kcal · ${i.protein} g</small></li>`).join('')}</ul>
+        <p class="sim-total">Day ends at <b>${S.endK}</b> / ${T.kcal + A.exerciseBonus} kcal and <b>${S.endP}</b> / ${T.protein} g protein.</p>` : '') +
+      (S.toGo > 0 ? `<b>Where this leads</b><p class="sim-total">Eat like this every day: ${S.ideal.perWeek} lb/week, goal ${state.profile.goalWeight} lb by <b>${S.when(S.ideal.weeks)}</b>.` +
+        (S.actual ? `<br>Your last ${''}week (avg ${S.avgK} kcal): ${S.actual.perWeek > 0 ? S.actual.perWeek + ' lb/week, goal by <b>' + S.when(S.actual.weeks) + '</b>' : '<b>no loss</b>'}.` : '') + '</p>' : '');
+    $('chat').appendChild(card); card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const sim = `Simulation for the rest of today (time ${nowTime()}): do next: ${S.acts.join(' ')} Ideal remaining meals: ${S.plan.items.map(i => `${i.slot}: ${i.name} (${i.kcal} kcal, ${i.protein} g protein)`).join('; ') || 'none'}. ` +
+      `Day would end at ${S.endK} kcal and ${S.endP} g protein vs targets ${T.kcal + A.exerciseBonus} kcal and ${T.protein} g. ` +
+      (S.toGo > 0 ? `Ideal days: ${S.ideal.perWeek} lb/week, goal by ${S.when(S.ideal.weeks)}.` + (S.actual ? ` Last week average ${S.avgK} kcal: ${S.actual.perWeek} lb/week, goal by ${S.when(S.actual.weeks)}.` : '') : '');
+    if (settings.anthropicKey) ask(`What should I do next? ${sim} Give me my next one or two actions first, then one tip that makes the rest of today easier. Use the simulation numbers. Under 70 words, spoken style.`, true);
+    else say(S.acts.slice(0, 2).join(' '), { pose: 'think', bubble: false });
+  }
+  $('nextBtn').onclick = showNext;
+  $('nextBtn2').onclick = showNext;
 
   // ---------- if-then plans ----------
   function renderPlans() {
@@ -335,7 +410,9 @@
     $('rName').value = r.name || 'Meal';
     $('rVerdict').textContent = r.verdict || '';
     $('rSwap').innerHTML = r.swap_tip ? `<b>Better:</b> ${esc(r.swap_tip)}` : '';
-    $('rItems').innerHTML = (r.items || []).map(i => `<li><span class="dot ${['green', 'yellow', 'red'].includes(i.color) ? i.color : 'yellow'}"></span> ${esc(i.food)} <small>(${esc(i.portion || '')}) ~${Math.round(i.kcal || 0)} kcal</small></li>`).join('');
+    editItems = (r.items || []).map(i => ({ food: i.food || '', portion: i.portion || '', kcal: Math.round(i.kcal || 0), color: i.color }));
+    baseMacros = { kcal: r.kcal || 0, protein: r.protein_g || 0, carbs: r.carbs_g || 0, fat: r.fat_g || 0, fiber: r.fiber_g || 0 };
+    renderItems(); $('recheckBtn').hidden = true;
     $('rKcal').value = Math.round(r.kcal || 0); $('rProt').value = Math.round(r.protein_g || 0);
     $('rCarb').value = Math.round(r.carbs_g || 0); $('rFat').value = Math.round(r.fat_g || 0);
     $('rFib').value = Math.round(r.fiber_g || 0); $('rScore').value = Math.round(r.health_score || 0);
@@ -349,13 +426,66 @@
     say(Tips.pick(Tips.REACT[light], r.name || '') + tail, { bubble: false, box: boxes.log });
   }
 
+  // Editable item list: food, amount, kcal. Totals follow the items; macros scale with the calories.
+  let editItems = [], baseMacros = null;
+  const num = s => { const m = String(s).match(/(\d+(?:\.\d+)?)(?:\s*\/\s*(\d+))?/); return m ? (m[2] ? +m[1] / +m[2] : +m[1]) : null; };
+  function renderItems() {
+    $('rItems').innerHTML = editItems.map((i, k) => `<div class="item-row" data-k="${k}">
+      <span class="dot ${['green', 'yellow', 'red'].includes(i.color) ? i.color : 'yellow'}"></span>
+      <input class="i-food" value="${esc(i.food)}" placeholder="Food">
+      <input class="i-qty" value="${esc(i.portion)}" placeholder="e.g. 1 cup">
+      <input class="i-kcal" type="number" inputmode="numeric" value="${i.kcal}">
+      <button class="i-del" title="Remove">✕</button></div>`).join('') || '<p class="hint">No items. Add one below.</p>';
+  }
+  function itemsChanged() {
+    const total = editItems.reduce((a, i) => a + (+i.kcal || 0), 0);
+    $('rKcal').value = Math.round(total);
+    if (baseMacros && baseMacros.kcal > 0) {
+      const f = total / baseMacros.kcal;
+      $('rProt').value = Math.round(baseMacros.protein * f); $('rCarb').value = Math.round(baseMacros.carbs * f);
+      $('rFat').value = Math.round(baseMacros.fat * f); $('rFib').value = Math.round(baseMacros.fiber * f);
+    }
+    $('recheckBtn').hidden = !settings.anthropicKey;
+  }
+  $('rItems').addEventListener('input', e => {
+    const row = e.target.closest('.item-row'); if (!row) return;
+    const it = editItems[+row.dataset.k];
+    if (e.target.classList.contains('i-food')) it.food = e.target.value;
+    if (e.target.classList.contains('i-kcal')) it.kcal = +e.target.value || 0;
+    if (e.target.classList.contains('i-qty')) {
+      const a = num(it.portion), b = num(e.target.value);   // "1 cup" -> "2 cups" doubles the calories
+      if (a && b && a !== b) { it.kcal = Math.round(it.kcal * b / a); row.querySelector('.i-kcal').value = it.kcal; }
+      it.portion = e.target.value;
+    }
+    itemsChanged();
+  });
+  $('rItems').addEventListener('click', e => {
+    if (!e.target.classList.contains('i-del')) return;
+    editItems.splice(+e.target.closest('.item-row').dataset.k, 1); renderItems(); itemsChanged();
+  });
+  $('addItem').onclick = () => {
+    editItems.push({ food: '', portion: '', kcal: 0, color: 'yellow' }); renderItems(); itemsChanged();
+    const rows = $('rItems').querySelectorAll('.i-food'); rows[rows.length - 1].focus();
+  };
+  $('recheckBtn').onclick = async () => {
+    const list = editItems.filter(i => i.food.trim()).map(i => `${i.portion ? i.portion + ' ' : ''}${i.food}${i.kcal ? ` (about ${i.kcal} kcal)` : ''}`).join('; ');
+    if (!list) return;
+    $('recheckBtn').disabled = true; $('recheckBtn').textContent = 'Maya is checking…';
+    try {
+      const r = await Services.analyzeMealText(settings, `The person corrected the photo estimate. These foods and amounts are exactly what they ate: ${list}. Keep these items and amounts; where they give calories, use them.`);
+      const keepDate = $('rDate').value, keepTime = $('rTime').value;
+      showResult(r); $('rDate').value = keepDate; $('rTime').value = keepTime;
+    } catch (e) { toast(e.message); }
+    $('recheckBtn').disabled = false; $('recheckBtn').textContent = '↻ Re-check with my changes';
+  };
+
   $('saveMeal').onclick = async () => {
     const r = pendingMeal && pendingMeal.result || {}, before = Gamify.dayPoints(state, today()).total;
     const m = {
       id: uid(), date: $('rDate').value || today(), time: $('rTime').value || nowTime(), name: $('rName').value || 'Meal',
       kcal: +$('rKcal').value || 0, protein: +$('rProt').value || 0, carbs: +$('rCarb').value || 0, fat: +$('rFat').value || 0,
       fiber: +$('rFib').value || 0, score: +$('rScore').value || null, light: r.light || null, verdict: r.verdict || '', tip: r.swap_tip || '',
-      items: r.items || [], source: pendingMeal && pendingMeal.thumb ? 'photo' : 'text', updatedAt: Date.now()
+      items: editItems.filter(i => i.food.trim()).map(i => ({ food: i.food.trim(), portion: i.portion.trim(), kcal: +i.kcal || 0, color: i.color })), source: pendingMeal && pendingMeal.thumb ? 'photo' : 'text', updatedAt: Date.now()
     };
     state.meals.push(m);
     if (pendingMeal && pendingMeal.thumb) await Services.putThumb(m.id, pendingMeal.thumb);
@@ -375,7 +505,10 @@
     else feed.innerHTML = days.map(d => {
       const t = Coach.dayTotals(state, d);
       const label = new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
-      return `<div class="day-head">${label}<small>${Math.round(t.kcal)} kcal · ${Math.round(t.protein)} g protein ${t.kcal > T.kcal + 100 ? '· ✕ over' : '· ✓ on target'}</small></div>` +
+      const ex = Coach.extraExercise(state, d), bonus = Coach.exerciseBonus(state, d);
+      const gym = Coach.live(state.workouts).some(w => w.date === d && !w.extra && w.done !== false);
+      const exLine = (gym ? '🏋️ Weights + 5k ' : '') + ex.map(w => `${(Coach.EXERCISE[w.type] || Coach.EXERCISE.other).icon} ${w.minutes} min `).join('');
+      return `<div class="day-head">${label}<small>${Math.round(t.kcal)} kcal · ${Math.round(t.protein)} g protein ${t.kcal > T.kcal + bonus + 100 ? '· ✕ over' : '· ✓ on target'}${exLine ? '<br>' + exLine : ''}</small></div>` +
         byDay[d].sort((a, b) => a.time < b.time ? -1 : 1).map(m => {
           const light = Coach.mealLight(m, T.kcal);
           return `<div class="panel dcard ${light}" data-id="${m.id}"><div class="noimg">🍽</div><div>
@@ -459,12 +592,25 @@
     Services.stopSpeaking(); $('micBtn').classList.add('listening');
     rec = Services.listen(t => ask(t), () => { rec = null; $('micBtn').classList.remove('listening'); });
   };
-  $('voiceOn').onchange = e => { settings.voiceOn = e.target.checked; saveSettings(); if (!settings.voiceOn) { Services.stopSpeaking(); LiveMaya.stop(); } };
+  // Voice on/off (Today and Maya tabs) and stop
+  function stopTalking() { Services.stopSpeaking(); LiveMaya.stop(); allMaya().forEach(i => i.talk(false)); }
+  function voiceButtons() {
+    ['hearBtn', 'muteBtn'].forEach(id => { const b = $(id); b.textContent = settings.voiceOn ? '🔊 Voice on' : '🔇 Muted'; b.classList.toggle('muted', !settings.voiceOn); b.title = settings.voiceOn ? 'Tap to mute Maya' : 'Tap to let Maya talk'; });
+  }
+  function toggleVoice() {
+    settings.voiceOn = !settings.voiceOn; saveSettings(); voiceButtons();
+    if (!settings.voiceOn) { stopTalking(); toast('Maya is muted'); }
+    else say(document.querySelector('#tab-today.active') ? $('bubble').textContent : "I'm back. Talk to me.", { pose: 'wave', bubble: false });
+  }
+  $('muteBtn').onclick = toggleVoice;
+  $('stopBtn').onclick = stopTalking;
+  Services.onSpeaking(on => { $('stopBtn').hidden = !on; });
 
   // Maya on the Today screen
-  const heroTap = () => { $('tapHint').hidden = true; say($('bubble').textContent, { pose: 'wave', bubble: false }); };
+  const heroTap = () => { $('tapHint').hidden = true; if (Services.isSpeaking()) { stopTalking(); return; } say($('bubble').textContent, { pose: 'wave', bubble: false }); };
   $('mayaHero').onclick = heroTap;
-  $('hearBtn').onclick = heroTap;
+  $('hearBtn').onclick = () => { $('tapHint').hidden = true; toggleVoice(); };
+  $('mayaCoach').addEventListener('click', () => { if (Services.isSpeaking()) stopTalking(); });
   $('tipBtn').onclick = () => { const t = tipLine(); say(t, { pose: Math.random() < .5 ? 'thumbs' : 'think' }); };
 
   // First touch of the session: Maya waves and greets out loud (browsers block audio before a tap).
@@ -507,7 +653,7 @@
     saveSettings(); liveBroken = false; LiveMaya.close(); applyLiveMode();
   }
   $('saveKeys').onclick = () => { readKeys(); toast('Saved'); doSync(true); };
-  $('testVoice').onclick = () => { readKeys(); go('maya'); const was = settings.voiceOn; settings.voiceOn = true; say(`Hi ${state.profile.name}, I'm ${state.profile.coachName}. Let's lose those twenty pounds together!`, { pose: 'wave', bubble: false }); settings.voiceOn = was; };
+  $('testVoice').onclick = () => { readKeys(); go('maya'); const was = settings.voiceOn; say(`Hi ${state.profile.name}, I'm ${state.profile.coachName}. Let's lose those twenty pounds together!`, { pose: 'wave', bubble: false, force: true }); };
   $('exportBtn').onclick = () => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 1)], { type: 'application/json' }));
@@ -542,7 +688,7 @@
 
   // ---------- boot ----------
   if (!localStorage.getItem(SKEY)) saveState();
-  $('voiceOn').checked = !!settings.voiceOn;
+  voiceButtons();
   applyLiveMode();
   if (DESK) document.body.classList.add('desk');
   refresh();
@@ -565,7 +711,7 @@
   let pendingUpdate = null;
   $('appVersion').textContent = 'Version ' + CODE_VERSION;
   function safeToReload() {
-    return !pendingMeal && !rec && !$('chatInput').value && !$('wInput').value && $('planModal').hidden &&
+    return !pendingMeal && !rec && !$('chatInput').value && !$('wInput').value && $('planModal').hidden && $('exModal').hidden &&
       !document.querySelector('.msg.typing');
   }
   async function hardReload(v) {

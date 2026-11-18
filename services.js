@@ -77,12 +77,18 @@ ${summary}`;
   }
 
   // ---------------- Voice (Azure neural) ----------------
-  let audioEl = null;
+  let audioEl = null, gen = 0, speaking = false;
+  const speakListeners = [];
+  function setSpeaking(v) { if (speaking !== v) { speaking = v; speakListeners.forEach(f => f(v)); } }
   function esc(s) { return s.replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c])); }
 
   async function speak(settings, text, onStart, onEnd, onAudio) {
     if (!settings.voiceOn) { onEnd && onEnd(); return; }
     stopSpeaking();
+    const my = gen;
+    const start = onStart, end = onEnd;
+    onStart = () => { setSpeaking(true); start && start(); };
+    onEnd = () => { if (my === gen) setSpeaking(false); end && end(); };
     if (settings.azureKey && settings.azureRegion) {
       try {
         const voice = settings.voice || 'en-US-AvaMultilingualNeural';
@@ -94,13 +100,15 @@ ${summary}`;
         });
         if (!r.ok) throw new Error('Azure speech error ' + r.status);
         const blob = await r.blob();
+        if (my !== gen) { end && end(); return; }          // stopped or muted while the voice was downloading
         audioEl = new Audio(URL.createObjectURL(blob));
         if (onAudio) onAudio(audioEl);
         audioEl.onplay = () => onStart && onStart();
         audioEl.onended = audioEl.onerror = () => onEnd && onEnd();
         await audioEl.play();
         return;
-      } catch (e) { console.warn('Azure voice failed, using device voice', e); }
+      } catch (e) {
+        if (my !== gen) { end && end(); return; } console.warn('Azure voice failed, using device voice', e); }
     }
     // Fallback: device voice, so the app still talks without an Azure key.
     if ('speechSynthesis' in window) {
@@ -113,9 +121,13 @@ ${summary}`;
     } else onEnd && onEnd();
   }
   function stopSpeaking() {
+    gen++;
     if (audioEl) { audioEl.pause(); audioEl = null; }
     if ('speechSynthesis' in window) speechSynthesis.cancel();
+    setSpeaking(false);
   }
+  function onSpeaking(f) { speakListeners.push(f); }
+  function isSpeaking() { return speaking; }
 
   // Speech-to-text for talking to the coach (Chrome on Android, Edge on Windows).
   function listen(onText, onDone) {
@@ -192,5 +204,5 @@ ${summary}`;
     });
   }
 
-  root.Services = { analyzeMealPhoto, analyzeMealText, coachReply, speak, stopSpeaking, listen, sync, ghPull, putThumb, getThumb, resizeImage };
+  root.Services = { analyzeMealPhoto, analyzeMealText, coachReply, speak, stopSpeaking, onSpeaking, isSpeaking, listen, sync, ghPull, putThumb, getThumb, resizeImage };
 })(self);

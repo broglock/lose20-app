@@ -13,7 +13,8 @@
     lunch: [
       ['Chicken burrito bowl, no cheese, extra salsa', 520, 42], ['Tuna salad wrap with greens', 430, 35],
       ['Lentil soup + side salad', 420, 24], ['Turkey and avocado on rye + apple', 480, 32],
-      ['Leftover salmon over greens and quinoa', 520, 38], ['Big Greek salad with grilled chicken', 470, 40]
+      ['Leftover salmon over greens and quinoa', 520, 38], ['Big Greek salad with grilled chicken', 470, 40],
+      ['Chicken salad, light dressing', 350, 35]
     ],
     snack: [
       ['Apple + string cheese', 170, 7], ['Beef jerky + carrots', 150, 15], ['Greek yogurt cup', 120, 15],
@@ -22,7 +23,8 @@
     dinner: [
       ['Grilled chicken, roasted veg, 1/2 cup rice', 550, 45], ['Salmon, asparagus, small potato', 560, 40],
       ['Lean beef stir-fry with lots of veg', 520, 40], ['Turkey chili with beans', 480, 38],
-      ['Shrimp tacos on corn tortillas + slaw', 500, 35], ['Pork tenderloin, green beans, sweet potato', 520, 42]
+      ['Shrimp tacos on corn tortillas + slaw', 500, 35], ['Pork tenderloin, green beans, sweet potato', 520, 42],
+      ['Chicken and vegetable soup', 300, 28], ['Egg-white veggie scramble + salsa + 1 toast', 280, 28], ['White fish, big salad, light dressing', 360, 36]
     ]
   };
 
@@ -96,6 +98,45 @@
     return { slot, name: i[0], kcal: i[1], protein: i[2] };
   }
 
-  const api = { IDEAS, REACT, WEIGH_REACT, COMEBACK, MONDAY, MOTIVATE, PLANS, ideaFor, pick, slotOf };
+  // ---------- "What should I do next?" simulation ----------
+  // Plans the rest of today so it lands on the calorie and protein targets, using the meal ideas above.
+  // Slots already eaten (a meal logged in that window) or already past are skipped.
+  const SLOTS = [['breakfast', 6, 10.5], ['lunch', 10.5, 14], ['snack', 14, 16.5], ['dinner', 16.5, 20.5]];
+  function slotHour(time) { const [h, m] = String(time || '12:00').split(':').map(Number); return h + (m || 0) / 60; }
+  function planRest(opts) {
+    // opts: hour, kcalLeft, proteinLeft, meals (today's, with .time)
+    const eaten = new Set((opts.meals || []).map(m => slotOf(slotHour(m.time))));
+    let open = SLOTS.filter(([n, , end]) => opts.hour < end && !eaten.has(n)).map(s => s[0]);
+    const kcalLeft = opts.kcalLeft, protLeft = opts.proteinLeft;
+    if (kcalLeft < 120 || !open.length) {
+      if (opts.hour < 20.5 && kcalLeft >= 120) open = ['snack'];
+      else return { items: [], kcal: 0, protein: 0, closed: true };
+    }
+    const roomy = n => Math.max(...IDEAS[n].map(i => i[1]));
+    if (kcalLeft > 1300 && !open.includes('snack')) open.push('snack');     // room for a planned snack
+    if (kcalLeft - open.reduce((a, n) => a + roomy(n), 0) > 200) open.push('snack');
+    const pools = open.map(n => IDEAS[n].map(i => ({ slot: n, name: i[0], kcal: i[1], protein: i[2] })));
+    let best = null;
+    const walk = (k, chosen, kc, pr) => {
+      if (k === pools.length) {
+        const over = Math.max(0, kc - kcalLeft), under = Math.max(0, kcalLeft - 60 - kc);
+        const score = over / 20 + under / 60 + Math.max(0, protLeft - pr) / 4 + (kcalLeft < 400 ? kc / 100 : 0);
+        if (!best || score < best.score) best = { score, items: chosen.slice(), kcal: kc, protein: pr };
+        return;
+      }
+      for (const it of pools[k]) { if (chosen.some(c => c.name === it.name)) continue; chosen.push(it); walk(k + 1, chosen, kc + it.kcal, pr + it.protein); chosen.pop(); }
+    };
+    walk(0, [], 0, 0);
+    const order = SLOTS.map(s => s[0]);
+    best.items.sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot));
+    return best;
+  }
+  // Weight projection: ideal days vs the last 7 days as actually eaten.
+  function projectWeeks(lbToGo, tdee, kcalPerDay) {
+    const perWeek = (tdee - kcalPerDay) * 7 / 3500;
+    return { perWeek: Math.round(perWeek * 10) / 10, weeks: perWeek > 0.05 ? Math.ceil(lbToGo / perWeek) : null };
+  }
+
+  const api = { SLOTS, planRest, projectWeeks, IDEAS, REACT, WEIGH_REACT, COMEBACK, MONDAY, MOTIVATE, PLANS, ideaFor, pick, slotOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Tips = api;
 })(typeof self !== 'undefined' ? self : this);

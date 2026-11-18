@@ -49,6 +49,31 @@
 
   // ---------- targets ----------
   // Mifflin-St Jeor BMR, times an activity factor, minus the deficit for the chosen pace.
+  // ---------- exercise ----------
+  // METs from the Compendium of Physical Activities (Ainsworth 2011). Net calories above resting,
+  // since resting burn is already in the targets.
+  const EXERCISE = {
+    weights: { name: 'Weights', icon: '🏋️', met: [3.5, 5, 6] },
+    run: { name: 'Run', icon: '🏃', met: [8, 9.8, 11.5] },
+    walk: { name: 'Walk', icon: '🚶', met: [3, 3.8, 5] },
+    bike: { name: 'Bike', icon: '🚴', met: [5.8, 8, 10] },
+    swim: { name: 'Swim', icon: '🏊', met: [6, 8, 10] },
+    elliptical: { name: 'Elliptical / rower', icon: '🚣', met: [5, 6, 8] },
+    hike: { name: 'Hike', icon: '🥾', met: [5.3, 6, 7.8] },
+    yoga: { name: 'Yoga / stretch', icon: '🧘', met: [2.5, 3, 4] },
+    sport: { name: 'Sport', icon: '🎾', met: [5, 7, 8] },
+    other: { name: 'Other', icon: '⚡', met: [3.5, 5, 7] }
+  };
+  const INTENSITY = ['easy', 'moderate', 'hard'];
+  function exerciseKcal(type, minutes, intensity, lb) {
+    const e = EXERCISE[type] || EXERCISE.other, i = Math.max(0, INTENSITY.indexOf(intensity));
+    return Math.round((e.met[i < 0 ? 1 : i] - 1) * (lb / LB_PER_KG) * (minutes / 60) / 5) * 5;
+  }
+  // The planned routine (weights + 5k) is already in the calorie target; extra activities earn back half their burn.
+  const isRoutine = w => !w.extra;
+  function extraExercise(state, d) { return live(state.workouts).filter(w => w.date === d && w.extra && w.done !== false); }
+  function exerciseBonus(state, d) { return Math.round(extraExercise(state, d).reduce((a, w) => a + (w.kcal || 0), 0) * 0.5 / 10) * 10; }
+
   function targets(profile, currentLb) {
     const kg = currentLb / LB_PER_KG;
     const cm = profile.heightIn * 2.54;
@@ -220,7 +245,7 @@
     // 10. Workouts this week vs plan
     const weekStart = addDays(today, -((dow(today) + 6) % 7)); // Monday
     const planned = lastNDays(today, daysBetween(weekStart, today) + 1).filter(d => p.gymDays.includes(dow(d)) && d < today && d >= p.startDate);
-    const done = planned.filter(d => live(state.workouts).some(w => w.date === d && w.done !== false));
+    const done = planned.filter(d => live(state.workouts).some(w => w.date === d && isRoutine(w) && w.done !== false));
     if (planned.length) {
       if (done.length === planned.length) add(wins, 2, 'gym', 'Every gym session done', `${done.length} of ${planned.length} this week.`);
       else add(problems, 2, 'gym', 'Missed gym sessions', `${done.length} of ${planned.length} planned sessions done this week.`);
@@ -244,10 +269,12 @@
     return {
       today, targets: T, nowLb, lost, pct, rate, projection, series,
       todayTotals: todayT,
-      remaining: T.kcal - todayT.kcal,
+      remaining: T.kcal + exerciseBonus(state, today) - todayT.kcal,
+      exerciseBonus: exerciseBonus(state, today),
+      exerciseToday: extraExercise(state, today),
       proteinLeft: Math.max(0, T.protein - Math.round(todayT.protein)),
       isGymDay: p.gymDays.includes(dow(today)),
-      gymDoneToday: live(state.workouts).some(w => w.date === today && w.done !== false),
+      gymDoneToday: live(state.workouts).some(w => w.date === today && isRoutine(w) && w.done !== false),
       weighedToday: lastW === today,
       loggedDays, wins, problems, mood
     };
@@ -376,6 +403,7 @@
       `Current trend weight ${a.nowLb} lb (lost ${a.lost} lb, ${a.pct}% of goal).` + (a.rate != null ? ` 3-week trend ${(-a.rate).toFixed(1)} lb/week loss.` : ''),
       `Targets: ${a.targets.kcal} kcal, ${a.targets.protein} g protein, ${a.targets.fiber} g fiber.`,
       `Today so far: ${Math.round(a.todayTotals.kcal)} kcal, ${Math.round(a.todayTotals.protein)} g protein, ${a.todayTotals.meals} meals logged. ${a.remaining} kcal left.`,
+      (a.exerciseToday && a.exerciseToday.length ? `Extra exercise today: ${a.exerciseToday.map(w => `${(EXERCISE[w.type] || EXERCISE.other).name} ${w.minutes} min ${w.intensity} (~${w.kcal} kcal)`).join(', ')}; ${a.exerciseBonus} kcal added to today's budget.\n` : '') +
       `Gym day: ${a.isGymDay ? 'yes' : 'no'}${a.isGymDay ? (a.gymDoneToday ? ' (done)' : ' (not done yet)') : ''}. Weighed in today: ${a.weighedToday ? 'yes' : 'no'}.`,
       'Going right: ' + (a.wins.map(w => w.title + ' (' + w.detail + ')').join('; ') || 'nothing yet'),
       'Going wrong: ' + (a.problems.map(w => w.title + ' (' + w.detail + ')').join('; ') || 'nothing')
@@ -384,6 +412,6 @@
   }
 
   const api = { defaultState, targets, weightSeries, currentWeight, trendRate, dayTotals, analyze, pickTip, TIPS,
-    mergeState, mergeArrays, mealLight, summaryText, ymd, addDays, lastNDays, daysBetween, isWeekend, live };
+    mergeState, mergeArrays, mealLight, summaryText, EXERCISE, INTENSITY, exerciseKcal, exerciseBonus, extraExercise, isRoutine, ymd, addDays, lastNDays, daysBetween, isWeekend, live };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Coach = api;
 })(typeof self !== 'undefined' ? self : this);

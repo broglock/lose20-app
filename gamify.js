@@ -9,7 +9,7 @@
   'use strict';
   const C = (typeof module !== 'undefined' && module.exports) ? require('./coach.js') : root.Coach;
 
-  const PTS = { meal: 10, photo: 5, green: 10, weigh: 15, protein: 20, gym: 30, onTarget: 20, plan: 10, fiber: 10 };
+  const PTS = { meal: 10, photo: 5, green: 10, weigh: 15, protein: 20, gym: 30, onTarget: 20, plan: 10, fiber: 10, move: 15 };
   const BANK_START = 200, BANK_COST = { noLog: 40, noWeigh: 20, overBig: 20 };
   const LEVELS = ['Rookie', 'Starter', 'Regular', 'Committed', 'Disciplined', 'Machine', 'Iron', 'Legend'];
   // Each level needs more points than the last (about 3 days, then 4, 5 ... of solid days).
@@ -17,7 +17,7 @@
 
   function tgt(state, today) { return C.targets(state.profile, C.currentWeight(state, today)); }
   function weighSet(state) { return new Set(C.live(state.weights).map(w => w.date)); }
-  function gymDone(state, d) { return C.live(state.workouts).some(w => w.date === d && w.done !== false); }
+  function gymDone(state, d) { return C.live(state.workouts).some(w => w.date === d && !w.extra && w.done !== false); }
 
   // Points earned on one day, itemised.
   function dayPoints(state, d, T) {
@@ -35,8 +35,9 @@
     if (t.protein >= T.protein * 0.9) add('Protein target', PTS.protein);
     if (t.fiber >= 25) add('Fiber 25 g', PTS.fiber);
     if (gymDone(state, d)) add('Workout', PTS.gym);
+    if (C.extraExercise(state, d).length) add('Extra exercise', PTS.move);
     // On target only counts with a full day logged and not under the safe floor.
-    if (t.meals >= 3 && t.kcal <= T.kcal + 100 && t.kcal >= T.kcal - 700) add('On calorie target', PTS.onTarget);
+    if (t.meals >= 3 && t.kcal <= T.kcal + C.exerciseBonus(state, d) + 100 && t.kcal >= T.kcal - 700) add('On calorie target', PTS.onTarget);
     C.live(state.planChecks || []).filter(c => c.date === d && c.kept).forEach(() => add('Kept an if-then plan', PTS.plan));
     return { total: items.reduce((s, i) => s + i.n, 0), items };
   }
@@ -163,7 +164,7 @@
       photoMeals: meals.filter(m => m.source === 'photo').length,
       greenMeals: meals.filter(m => C.mealLight(m, T.kcal) === 'green').length,
       weighins: ws.size,
-      gym: C.live(state.workouts).filter(w => w.done !== false).length,
+      gym: C.live(state.workouts).filter(w => !w.extra && w.done !== false).length,
       plansKept: C.live(state.planChecks || []).filter(x => x.kept).length,
       lost: Math.max(0, p.startWeight - C.currentWeight(state, today)),
       best: {

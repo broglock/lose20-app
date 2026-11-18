@@ -242,3 +242,41 @@ body.desk .maya-box.big{width:260px;height:347px}
 .maya-box.big.pmaya{width:100%;max-width:330px;height:auto;aspect-ratio:3/4;margin:0 auto}
 .maya-box.small.pmaya{width:96px;height:128px}
 body.desk .maya-box.big.pmaya{max-width:380px}
+
+/* voice toggle and stop */
+.voice-row{display:flex;gap:8px;flex-wrap:wrap}
+.voice-btn.muted{background:#e9e2d2;color:#7a7067;text-decoration:none}
+.stop-btn{background:#d03b3b;color:#fff;border-color:#2b2622}
+
+/* editable meal items */
+.items-edit{margin:6px 0 10px}
+.items-head,.item-row{display:grid;grid-template-columns:12px 1fr 92px 64px 30px;gap:6px;align-items:center}
+.items-head{grid-template-columns:1fr 92px 64px 30px;padding-left:18px;font-size:13px;opacity:.7}
+.item-row{margin:4px 0}
+.item-row input{min-width:0;padding:6px 7px;font-size:15px}
+.item-row .i-del{padding:2px 0;min-width:0;background:none;border:none;box-shadow:none;font-size:16px;color:#a33}
+.items-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+
+/* next steps */
+.next-btn{display:block;width:100%;margin:6px 0 10px;background:var(--teal);color:#fff;font-weight:700;font-size:18px;-webkit-text-stroke:.3px var(--ink)}
+.coach-actions .next-btn{margin:0}
+.next-card{max-width:96%}
+.next-card ol,.next-card ul{margin:4px 0 8px;padding-left:20px}
+.next-card .sim{list-style:none;padding:0}
+.next-card .sim li{padding:3px 0;border-bottom:1px dashed #cfc4b0}
+.next-card .sim span{display:inline-block;min-width:74px;font-size:13px;text-transform:uppercase;opacity:.7}
+.next-card .sim small{white-space:nowrap;opacity:.75}
+.sim-total{margin:4px 0}
+
+/* exercise */
+.ex-list{list-style:none;padding:0;margin:6px 0 0;font-size:15px}
+.ex-list li{display:flex;align-items:center;gap:6px;padding:2px 0}
+.ex-list li small{opacity:.7}
+.ex-list .del{margin-left:auto;background:none;border:none;box-shadow:none;color:#a33;padding:0 4px}
+.ex-list .bonus{color:#0a7d0a;font-weight:700}
+.ex-types{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.ex-types button{padding:5px 9px;font-size:15px}
+.ex-types button.on,.seg button.on{background:var(--teal);color:#fff}
+.seg{display:flex;gap:6px;margin:8px 0}
+.seg button{flex:1}
+.ex-est{font-weight:700;margin:6px 0}
