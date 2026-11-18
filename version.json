@@ -1,6 +1,6 @@
 {
-  "version": "1.3.2",
-  "released": "2026-11-17",
+  "version": "1.4.0",
+  "released": "2026-11-18",
   "windows": {
     "nag.py": "c7aaf9afffd9e5f907dc02a1bbdfc7e8853c35df060e9d8bd9cd34a49b832312",
     "install_tasks.ps1": "d67456e74a851e0c8828412ba0a4e173866a7ea74728d5028d37cf37d5de71b4",
