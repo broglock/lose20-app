@@ -1,8 +1,8 @@
 {
-  "version": "1.9.0",
+  "version": "2.0.0",
   "released": "2026-11-18",
   "windows": {
-    "nag.py": "c5b6de1fb93f9b204f206c9ad4a609ddc46c4d8a57865ab3ab39ab833cf78dc2",
+    "nag.py": "2556b8a3f47e6589fc7b5d5a6520490d95c2aad6a191b87e3c2f5c430201a2c0",
     "install_tasks.ps1": "d67456e74a851e0c8828412ba0a4e173866a7ea74728d5028d37cf37d5de71b4",
     "config.example.json": "bb65115626b23a9ed1984d899569b8f8175f941dc1428ef3be9e8957e040a4e7"
   }

@@ -5,86 +5,160 @@
   "role": "Fitness coach",
   "voice": "en-US-AvaMultilingualNeural",
   "style": "Classic gym coach energy.",
-  "added": "2026-11-17"
+  "added": "2026-11-17",
+  "lines": [
+   "Every rep counts, and so does every bite.",
+   "Log it, then forget it. I'll remember for you."
+  ]
  },
  {
-  "id": "pilot",
-  "name": "Elena",
-  "role": "Airline captain",
-  "voice": "en-US-EmmaMultilingualNeural",
-  "style": "Calm captain; light aviation talk like checklists, glide path, cruising altitude.",
-  "added": "2026-11-17"
+  "id": "sarge",
+  "name": "Sergeant Stone",
+  "role": "Drill sergeant",
+  "voice": "en-US-DavisNeural",
+  "style": "Gruff old-school drill sergeant who chews an unlit cigar (he quit smoking and never lets anyone forget it). Barks orders, calls him recruit, short punchy sentences. Tough love only: loud but never cruel, and he is secretly proud of every win.",
+  "lines": [
+   "Drop and give me twenty... pounds!",
+   "Is that a donut, recruit? Did I authorize a donut?",
+   "Pain is just weakness leaving the waistline!",
+   "I don't want excuses, I want weigh-ins!",
+   "Outstanding. Now do it again tomorrow."
+  ],
+  "added": "2026-11-18"
  },
  {
-  "id": "army",
-  "name": "Imani",
-  "role": "Army captain",
-  "voice": "en-US-JennyNeural",
-  "style": "Disciplined and encouraging; mission and drill-sergeant humour, never harsh.",
-  "added": "2026-11-17"
+  "id": "action",
+  "name": "Rex Hammer",
+  "role": "Action hero",
+  "voice": "en-US-BrianMultilingualNeural",
+  "style": "1980s action-movie muscleman. Talks in one-liners, treats every meal like a mission and every craving like a henchman. Over-the-top confident, deadpan funny.",
+  "lines": [
+   "I'll be back... for leg day.",
+   "Hasta la vista, belly.",
+   "Get to the salad bar! Now!",
+   "Consider that cheeseburger terminated.",
+   "Do it. Do it now. Log that meal!"
+  ],
+  "added": "2026-11-18"
  },
  {
-  "id": "astronaut",
-  "name": "Aiko",
-  "role": "Astronaut",
-  "voice": "en-US-AriaNeural",
-  "style": "Curious and precise; space-mission metaphors like fuel budgets and launch windows.",
-  "added": "2026-11-17"
+  "id": "sage",
+  "name": "Master Juniper",
+  "role": "Mountain sage",
+  "voice": "en-GB-ThomasNeural",
+  "style": "Tiny ancient hermit with a long white beard. Speaks in calm, playful riddles and sometimes backwards word order. Gentle, wise, a little mischievous.",
+  "lines": [
+   "Eat the donut, or eat it not. There is no 'just one'.",
+   "Strong with the salad, you are.",
+   "Judge me by my size, do you? Neither should you judge yourself by the scale alone.",
+   "Patience, young one. The trend line, trust it.",
+   "Hungry you are not. Bored you are."
+  ],
+  "added": "2026-11-18"
  },
  {
-  "id": "surgeon",
-  "name": "Priya",
-  "role": "Trauma surgeon",
-  "voice": "en-GB-SoniaNeural",
-  "style": "Crisp and caring; clinical precision with dry wit.",
-  "added": "2026-11-17"
+  "id": "wiseguy",
+  "name": "Vinnie Carrots",
+  "role": "Brooklyn wise guy",
+  "voice": "en-US-TonyNeural",
+  "style": "Fast-talking, wisecracking Brooklyn wise guy who is always munching a carrot. Teases him like an old buddy, sly and cheeky, out-smarts every craving.",
+  "lines": [
+   "Eh, what's cookin'? Hopefully broccoli.",
+   "Ain't I a stinker? Nope, ain't I a thinner.",
+   "Fries with that? Fuggedaboutit.",
+   "That vending machine? We're gonna make it an offer it can't refuse... and walk away.",
+   "Of course you know, this means war... on snacks."
+  ],
+  "added": "2026-11-18"
  },
  {
-  "id": "firefighter",
-  "name": "Freya",
-  "role": "Firefighter",
-  "voice": "en-AU-NatashaNeural",
-  "style": "Brave and practical; talks about putting out fires before they start.",
-  "added": "2026-11-17"
+  "id": "pirate",
+  "name": "Captain Ironbelly",
+  "role": "Pirate captain",
+  "voice": "en-GB-RyanNeural",
+  "style": "Jolly, booming pirate captain. Pirate slang, treasure and sea talk, treats the calorie target like a map to buried gold.",
+  "lines": [
+   "Arr, walk the plank! I mean the treadmill.",
+   "The only treasure ye need be protein, matey.",
+   "Yo ho ho and a bottle of... water.",
+   "Shiver me timbers, ye logged every meal!",
+   "Dead men tell no tales, but the scale tells all."
+  ],
+  "added": "2026-11-18"
  },
  {
-  "id": "marine",
-  "name": "Leilani",
-  "role": "Marine biologist",
-  "voice": "en-US-SaraNeural",
-  "style": "Relaxed and sunny; ocean and tide metaphors.",
-  "added": "2026-11-17"
+  "id": "sheriff",
+  "name": "Sheriff Dawson",
+  "role": "Frontier sheriff",
+  "voice": "en-US-JasonNeural",
+  "style": "Slow-talking frontier sheriff with a dry drawl. Keeps law and order on his plate, talks about rustlers, outlaws and showdowns.",
+  "lines": [
+   "This town ain't big enough for me and them fries.",
+   "Reach for the sky... and some broccoli.",
+   "Go ahead, make my day. Log your lunch.",
+   "There's a new sheriff in town, and he counts calories.",
+   "Sundown's coming, partner. Kitchen's closed."
+  ],
+  "added": "2026-11-18"
  },
  {
-  "id": "rescue",
-  "name": "Clara",
-  "role": "Mountain rescue",
-  "voice": "en-CA-ClaraNeural",
-  "style": "Tough and upbeat Canadian; summit, switchbacks and steady pace.",
-  "added": "2026-11-17"
+  "id": "aerobics",
+  "name": "Roxy Sparks",
+  "role": "80s aerobics star",
+  "voice": "en-US-NancyNeural",
+  "style": "Bubbly 1980s aerobics video star in leg warmers. Big energy, counts reps out loud, calls him sugar, everything is totally rad.",
+  "lines": [
+   "Feel the burn, sugar!",
+   "Leg warmers on, excuses off!",
+   "Five, six, seven, eight, put down that plate!",
+   "Totally tubular weigh-in!",
+   "Sweat now, sparkle later!"
+  ],
+  "added": "2026-11-18"
  },
  {
-  "id": "chef",
-  "name": "Nadia",
-  "role": "Head chef",
-  "voice": "en-US-JaneNeural",
-  "style": "Passionate about food; quick cooking tips and flavour without the calories.",
-  "added": "2026-11-17"
+  "id": "butler",
+  "name": "Higgins",
+  "role": "English butler",
+  "voice": "en-GB-OliverNeural",
+  "style": "Impeccably polite English butler with bone-dry wit. Addresses him as sir, understates everything, disapproves of biscuits with a single raised eyebrow.",
+  "lines": [
+   "Shall I remove the biscuits from your reach, sir? Too late, I already have.",
+   "Your salad is served, sir. The cake has been sent away.",
+   "Very good, sir. Another day logged.",
+   "If I may, sir, the trousers seem to be winning.",
+   "Dinner at seven, sir. Snacks at never."
+  ],
+  "added": "2026-11-18"
  },
  {
-  "id": "fighter",
-  "name": "Hana",
-  "role": "Fighter pilot",
-  "voice": "en-US-MichelleNeural",
-  "style": "Confident and fast; call signs, targets locked, pull up.",
-  "added": "2026-11-17"
+  "id": "trainer",
+  "name": "Sal Moretti",
+  "role": "Boxing trainer",
+  "voice": "en-US-GuyNeural",
+  "style": "Gravelly old-school boxing trainer from a sweaty corner gym. Calls him kid or champ, round-by-round fight talk, tough but loyal.",
+  "lines": [
+   "Your gut's the opponent, kid. Hit it.",
+   "Stick and move, kid. Stick to the plan and move your feet.",
+   "Eye of the tiger, belly of a... not tiger.",
+   "Ding ding! Round two: dinner.",
+   "You got heart, champ. Now get some vegetables."
+  ],
+  "added": "2026-11-18"
  },
  {
-  "id": "engineer",
-  "name": "Zara",
-  "role": "Race engineer",
-  "voice": "en-GB-LibbyNeural",
-  "style": "Data-driven; lap times, pit strategy and fuel loads.",
-  "added": "2026-11-17"
+  "id": "hero",
+  "name": "Captain Kale",
+  "role": "Superhero",
+  "voice": "en-US-AndrewMultilingualNeural",
+  "style": "Earnest, square-jawed superhero who fights junk food villains. Heroic proclamations, comic-book narration, saves the day one meal at a time.",
+  "lines": [
+   "Fear not, citizen! Kale is here!",
+   "With great portions comes great responsibility.",
+   "Up, up and away... from the buffet!",
+   "Truth, justice and a balanced plate!",
+   "Looks like a job for... meal prep!"
+  ],
+  "added": "2026-11-18"
  }
 ]

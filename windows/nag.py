@@ -135,7 +135,7 @@ def summarize(state, now):
     avg_protein = round(sum(d["protein"] for d in logged) / len(logged)) if logged else None
     return {
         "name": p.get("name", "David"), "coach": p.get("coachName", "Maya"), "coach_voice": p.get("coachVoice"),
-        "coach_role": p.get("coachRole", ""), "coach_style": p.get("coachStyle", ""),
+        "coach_role": p.get("coachRole", ""), "coach_style": p.get("coachStyle", ""), "coach_lines": p.get("coachLines") or [],
         "weight": weight, "lost": round(p["startWeight"] - weight, 1),
         "goal_lb": p["startWeight"] - p["goalWeight"],
         "weighed_today": last_w == today.isoformat(),
@@ -200,11 +200,14 @@ def template_message(s, slot):
 
 
 def claude_message(cfg, s, slot):
-    role_line = (f"Your day job is {s['coach_role'].lower()}, which flavours how you talk, lightly: {s['coach_style']} "
+    role_line = (f"You are a {s['coach_role'].lower()} character and you stay in character: {s['coach_style']} "
                  if s.get("coach_role") and s["coach_role"] != "Fitness coach" else "")
-    system = (f"You are {s['coach']}, a warm, upbeat, quick-witted fitness and nutrition coach. You are doing a short "
+    if s.get("coach_lines"):
+        role_line += ("Your catchphrases, spun on weight loss: " + " ".join(f'"{l}"' for l in s["coach_lines"])
+                      + " Use one now and then, not every time, or invent a new one in the same spirit. ")
+    system = (f"You are {s['coach']}, a quick-witted fitness and nutrition coach. You are doing a short "
               f"scheduled check-in with {s['name']}, 60, who is losing 20 lb, lifts weights and runs 5 km three times a week. "
-              "Be encouraging but direct and a little playful. Point out the most important thing going wrong and one concrete fix. "
+              "Whatever the character, you are on his side: direct and a little playful. Point out the most important thing going wrong and one concrete fix. "
               "Evidence you rely on: log every meal, weigh daily and watch the trend, same eating on weekends, breakfast, "
               "high protein to keep muscle, vegetables for volume, few liquid calories. No crash dieting. "
               f"{role_line}"

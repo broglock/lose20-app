@@ -79,7 +79,7 @@
   const aOrAn = w => /^[aeiou]/i.test(w) ? 'an' : 'a';
   function applyCoach() {
     const c = coach(), p = state.profile;
-    Object.assign(p, { coachId: c.id, coachName: c.name, coachRole: c.role, coachStyle: c.style, coachVoice: c.voice });
+    Object.assign(p, { coachId: c.id, coachName: c.name, coachRole: c.role, coachStyle: c.style, coachVoice: c.voice, coachLines: c.lines || [] });
     if (self.PhotoMaya) PhotoMaya.setCoach(c.id);
     document.querySelectorAll('.cn').forEach(e => e.textContent = c.name);
     $('chatInput').placeholder = `Talk to ${c.name}, or say what you ate…`;
@@ -99,8 +99,8 @@
     applyCoach(); saveState();
     const c = coach();
     const hello = why === 'rotate'
-      ? `Hi ${state.profile.name}! I'm ${c.name}, ${aOrAn(c.role)} ${c.role.toLowerCase()}. ${prev} handed me your plan for this week. Let's keep it going.`
-      : `Hi ${state.profile.name}, I'm ${c.name}. ${aOrAn(c.role)[0].toUpperCase() + aOrAn(c.role).slice(1)} ${c.role.toLowerCase()} by day, your coach the rest of the time. Let's do this.`;
+      ? `Hi ${state.profile.name}! I'm ${c.name}, ${aOrAn(c.role)} ${c.role.toLowerCase()}. ${prev} handed me your plan for this week. ${(c.lines && c.lines[0]) || "Let's keep it going."}`
+      : `Hi ${state.profile.name}, I'm ${c.name}. ${aOrAn(c.role)[0].toUpperCase() + aOrAn(c.role).slice(1)} ${c.role.toLowerCase()} by day, your coach the rest of the time. ${(c.lines && c.lines[0]) || "Let's do this."}`;
     $('bubble').textContent = hello;
     setTimeout(() => say(hello, { pose: 'wave', mood: 'cheer', bubble: false }), 600);
   }
