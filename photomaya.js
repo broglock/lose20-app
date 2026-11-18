@@ -6,15 +6,24 @@
    Same interface as the cartoon avatar (setMood, pose, talk, mouth), so the app doesn't care which is used. */
 (function (root) {
   'use strict';
-  const BASE = 'maya/';
+  let BASE = 'maya/coaches/maya/';
   let assets = null, loading = null;
+  const live = [];
 
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   function load() {
     if (loading) return loading;
-    loading = Promise.all([fetch(BASE + 'maya-frames.json').then(r => r.json()), loadImg(BASE + 'maya-base.jpg'), loadImg(BASE + 'maya-blink.jpg')])
-      .then(([meta, base, blink]) => { assets = { meta, base, blink }; });
+    const b = BASE;
+    loading = Promise.all([fetch(b + 'frames.json').then(r => r.json()), loadImg(b + 'base.jpg'), loadImg(b + 'blink.jpg')])
+      .then(([meta, base, blink]) => { if (b === BASE) assets = { meta, base, blink }; });
     return loading;
+  }
+  // Switch every on-screen instance to another coach's portrait.
+  let current = 'maya';
+  function setCoach(id) {
+    if (!id || id === current) return Promise.resolve();
+    current = id; BASE = 'maya/coaches/' + id + '/'; loading = null;
+    return load().then(() => live.forEach(i => i._reset()));
   }
 
   const VS = `attribute vec2 a;varying vec2 v;void main(){v=vec2(a.x*.5+.5,.5-a.y*.5);gl_Position=vec4(a,0.,1.);}`;
@@ -144,7 +153,7 @@ void main(){
   function create(el) {
     css();
     el.innerHTML = ''; el.classList.add('pmaya');
-    const cv = document.createElement('canvas');
+    let cv = document.createElement('canvas');
     const emoji = document.createElement('span'); emoji.className = 'pm-emoji';
     el.append(cv, emoji);
 
@@ -244,8 +253,14 @@ void main(){
       if (TAP[i] === 'surprised' || TAP[i] === 'cheer') { motion = 'bounce'; motionStart = performance.now(); }
     });
 
+    function reset() {
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      const nc = document.createElement('canvas'); nc.className = cv.className; nc.style.transform = cv.style.transform;
+      el.replaceChild(nc, cv); cv = nc; inst.svg = cv; G = null; ctx2d = null;
+      size(); kick();
+    }
     const inst = {
-      el, svg: cv,
+      el, svg: cv, _reset: reset,
       setMood(m) { mood = EXPR[m] ? m : 'happy'; el.className = el.className.replace(/\bmood-\S+/g, '').trim() + ' mood-' + m; kick(); },
       setOutfit() {},
       expression: react,
@@ -260,6 +275,7 @@ void main(){
       mouth(l, c) { external = true; talking = true; cv.classList.add('lipsync'); level = l; if (c != null) centroid = c; kick(); }
     };
     el._maya = inst;
+    live.push(inst);
     return inst;
   }
 
@@ -293,5 +309,5 @@ void main(){
     } catch (e) { return false; }
   }
 
-  root.PhotoMaya = { create, load, lipSync, EXPR };
+  root.PhotoMaya = { create, load, lipSync, EXPR, setCoach };
 })(self);

@@ -15,8 +15,9 @@
   // ---------- storage ----------
   const SKEY = 'lose20.state', KKEY = 'lose20.settings', CKEY = 'lose20.celebrated';
   let state = load(SKEY) || Coach.defaultState(today());
-  ['weights', 'meals', 'workouts', 'plans', 'planChecks', 'reports'].forEach(k => { if (!Array.isArray(state[k])) state[k] = []; });
-  let settings = Object.assign({ voiceOn: true, model: 'claude-sonnet-5-5', voice: 'en-US-AvaMultilingualNeural' }, load(KKEY) || {});
+  ['weights', 'meals', 'workouts', 'plans', 'planChecks', 'reports', 'groceries', 'recipes'].forEach(k => { if (!Array.isArray(state[k])) state[k] = []; });
+  let settings = Object.assign({ voiceOn: true, model: 'claude-sonnet-5-5', voice: '' }, load(KKEY) || {});
+  if (!settings.voiceV2) { settings.voice = ''; settings.voiceV2 = 1; }   // default: each coach's own voice
   let celebrated = load(CKEY) || {};
   let A = null, chatHistory = [], pendingMeal = null, rec = null, tipSeed = 0;
 
@@ -35,6 +36,52 @@
     result: MayaKind.create($('mayaResult'), { backdrop: true })
   };
   const allMaya = () => Object.values(maya);
+
+  // ---------- coaches ----------
+  // The roster (maya/coaches.json) is built by tools/build_coaches.py. The chosen coach lives in the
+  // synced profile, so phone and PC show the same one. Optionally a new coach takes over each week.
+  let COACHES = [{ id: 'maya', name: 'Maya', role: 'Fitness coach', voice: 'en-US-AvaMultilingualNeural', style: '' }];
+  const coach = () => COACHES.find(c => c.id === (state.profile.coachId || 'maya')) || COACHES[0];
+  const CN = () => coach().name;
+  const aOrAn = w => /^[aeiou]/i.test(w) ? 'an' : 'a';
+  function applyCoach() {
+    const c = coach(), p = state.profile;
+    Object.assign(p, { coachId: c.id, coachName: c.name, coachRole: c.role, coachStyle: c.style, coachVoice: c.voice });
+    if (self.PhotoMaya) PhotoMaya.setCoach(c.id);
+    document.querySelectorAll('.cn').forEach(e => e.textContent = c.name);
+    $('chatInput').placeholder = `Talk to ${c.name}, or say what you ate…`;
+    $('mayaHero').title = 'Tap ' + c.name;
+    $('mealNote').placeholder = `Note for ${c.name}: large portion, ranch dressing…`;
+    renderCoachGrid();
+  }
+  function renderCoachGrid() {
+    const g = $('coachGrid'); if (!g) return;
+    const cur = coach().id;
+    g.innerHTML = COACHES.map(c => `<button class="coach-card${c.id === cur ? ' on' : ''}" data-id="${c.id}"><img src="maya/coaches/${c.id}/thumb.jpg" alt=""><b>${esc(c.name)}</b><small>${esc(c.role)}</small></button>`).join('');
+    $('coachRotate').checked = state.profile.coachRotate !== false;
+  }
+  function switchCoach(id, why) {
+    const prev = CN();
+    state.profile.coachId = id; state.profile.coachSince = today(); state.profile.updatedAt = Date.now();
+    applyCoach(); saveState();
+    const c = coach();
+    const hello = why === 'rotate'
+      ? `Hi ${state.profile.name}! I'm ${c.name}, ${aOrAn(c.role)} ${c.role.toLowerCase()}. ${prev} handed me your plan for this week. Let's keep it going.`
+      : `Hi ${state.profile.name}, I'm ${c.name}. ${aOrAn(c.role)[0].toUpperCase() + aOrAn(c.role).slice(1)} ${c.role.toLowerCase()} by day, your coach the rest of the time. Let's do this.`;
+    $('bubble').textContent = hello;
+    setTimeout(() => say(hello, { pose: 'wave', mood: 'cheer', bubble: false }), 600);
+  }
+  function maybeRotate() {
+    const p = state.profile;
+    if (!p.coachSince) { p.coachSince = today(); return; }
+    if (p.coachRotate === false || COACHES.length < 2 || Coach.daysBetween(p.coachSince, today()) < 7) return;
+    const i = COACHES.findIndex(c => c.id === coach().id);
+    switchCoach(COACHES[(i + 1) % COACHES.length].id, 'rotate');
+  }
+  async function loadCoaches() {
+    try { const list = await fetch('maya/coaches.json').then(r => r.json()); if (Array.isArray(list) && list.length) COACHES = list; } catch (e) { /* offline: keep Maya */ }
+    applyCoach(); maybeRotate();
+  }
   function mayaMood(m) { allMaya().forEach(i => i.setMood(m)); }
 
   // Live photorealistic avatar (Azure). Cartoon Maya only shows if the live avatar is off or failing.
@@ -74,7 +121,8 @@
     speakAudio(text, inst);
   }
   function speakAudio(text, inst, cfg) {
-    Services.speak(cfg || settings, text,
+    cfg = Object.assign({}, cfg || settings); cfg.voice = cfg.voice || coach().voice;
+    Services.speak(cfg, text,
       () => { if (!inst[0].svg.classList.contains('lipsync')) inst.forEach(i => i.talk(true)); },
       () => inst.forEach(i => i.talk(false)),
       audio => (MayaKind.lipSync || Avatar.lipSync)(audio, inst));
@@ -101,6 +149,7 @@
     document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.go === tab));
     if (tab === 'progress') renderProgress();
     if (tab === 'diary') renderDiary();
+    if (tab === 'food') renderFood();
     if (tab === 'settings') renderSettings();
     if (tab === 'maya' && !$('chat').children.length) addMsg('her', greeting());
     window.scrollTo(0, 0);
@@ -338,7 +387,7 @@
     $('plans').innerHTML = plans.length ? plans.map(p => {
       const c = checks.find(x => x.planId === p.id && x.date === d);
       return `<li data-id="${p.id}"><span>${esc(p.text)}</span><span class="kept"><button class="small ${c && c.kept ? 'on' : ''}" data-k="1" title="Kept it">✓</button><button class="small no ${c && !c.kept ? 'on' : ''}" data-k="0" title="Missed it">✕</button></span></li>`;
-    }).join('') : '<li class="empty" style="display:block">No plans yet. Maya can suggest some for your weak spots.</li>';
+    }).join('') : '<li class="empty" style="display:block">No plans yet. ' + CN() + ' can suggest some for your weak spots.</li>';
     $('plans').querySelectorAll('button[data-k]').forEach(b => b.onclick = () => {
       const id = b.closest('li').dataset.id, kept = b.dataset.k === '1', cid = id + ':' + d;
       const before = Gamify.dayPoints(state, d).total;
@@ -390,7 +439,7 @@
   }
   $('analyzeTextBtn').onclick = async () => {
     const txt = $('mealText').value.trim(); if (!txt) return;
-    pendingMeal = { thumb: null }; $('analyzeStatus').textContent = 'Maya is thinking…';
+    pendingMeal = { thumb: null }; $('analyzeStatus').textContent = CN() + ' is thinking…';
     try { showResult(await Services.analyzeMealText(settings, txt)); $('analyzeStatus').textContent = ''; }
     catch (e) { $('analyzeStatus').textContent = e.message; }
   };
@@ -470,7 +519,7 @@
   $('recheckBtn').onclick = async () => {
     const list = editItems.filter(i => i.food.trim()).map(i => `${i.portion ? i.portion + ' ' : ''}${i.food}${i.kcal ? ` (about ${i.kcal} kcal)` : ''}`).join('; ');
     if (!list) return;
-    $('recheckBtn').disabled = true; $('recheckBtn').textContent = 'Maya is checking…';
+    $('recheckBtn').disabled = true; $('recheckBtn').textContent = CN() + ' is checking…';
     try {
       const r = await Services.analyzeMealText(settings, `The person corrected the photo estimate. These foods and amounts are exactly what they ate: ${list}. Keep these items and amounts; where they give calories, use them.`);
       const keepDate = $('rDate').value, keepTime = $('rTime').value;
@@ -498,34 +547,213 @@
   // ---------- diary ----------
   async function renderDiary() {
     const feed = $('diaryFeed'), T = Coach.targets(state.profile, Coach.currentWeight(state, today()));
-    const byDay = {};
-    Coach.live(state.meals).forEach(m => (byDay[m.date] = byDay[m.date] || []).push(m));
-    const days = Object.keys(byDay).sort().reverse().slice(0, 21);
-    if (!days.length) { feed.innerHTML = '<div class="panel"><p class="empty">Your food diary fills up as you snap meals.</p></div>'; }
+    const dates = new Set();
+    [state.meals, state.weights, state.workouts].forEach(l => Coach.live(l).forEach(x => dates.add(x.date)));
+    const days = [...dates].sort().reverse().slice(0, 30);
+    if (!days.length) { feed.innerHTML = '<div class="panel"><p class="empty">Your diary fills up as you log meals, weigh-ins and workouts.</p></div>'; }
     else feed.innerHTML = days.map(d => {
-      const t = Coach.dayTotals(state, d);
+      const t = Coach.dayTotals(state, d), bonus = Coach.exerciseBonus(state, d);
       const label = new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
-      const ex = Coach.extraExercise(state, d), bonus = Coach.exerciseBonus(state, d);
-      const gym = Coach.live(state.workouts).some(w => w.date === d && !w.extra && w.done !== false);
-      const exLine = (gym ? '🏋️ Weights + 5k ' : '') + ex.map(w => `${(Coach.EXERCISE[w.type] || Coach.EXERCISE.other).icon} ${w.minutes} min `).join('');
-      return `<div class="day-head">${label}<small>${Math.round(t.kcal)} kcal · ${Math.round(t.protein)} g protein ${t.kcal > T.kcal + bonus + 100 ? '· ✕ over' : '· ✓ on target'}${exLine ? '<br>' + exLine : ''}</small></div>` +
-        byDay[d].sort((a, b) => a.time < b.time ? -1 : 1).map(m => {
+      const meals = Coach.live(state.meals).filter(m => m.date === d).sort((a, b) => a.time < b.time ? -1 : 1);
+      const w = Coach.live(state.weights).find(x => x.date === d);
+      const wos = Coach.live(state.workouts).filter(x => x.date === d && x.done !== false);
+      const rows = (w ? `<div class="panel drow" data-kind="weight" data-id="${w.id}">⚖️ Weigh-in <b>${w.lb} lb</b><span class="edit-hint">✎</span></div>` : '') +
+        wos.map(x => { const E = x.extra ? (Coach.EXERCISE[x.type] || Coach.EXERCISE.other) : { icon: '🏋️', name: 'Weights + 5k' };
+          return `<div class="panel drow" data-kind="${x.extra ? 'exercise' : 'routine'}" data-id="${x.id}">${E.icon} ${E.name}${x.extra ? ` <b>${x.minutes} min</b> ${x.intensity} · ~${x.kcal} kcal` : ' <b>done</b>'}<span class="edit-hint">✎</span></div>`; }).join('');
+      return `<div class="day-head">${label}<small>${Math.round(t.kcal)} kcal · ${Math.round(t.protein)} g protein ${meals.length ? (t.kcal > T.kcal + bonus + 100 ? '· ✕ over' : '· ✓ on target') : ''}</small></div>` + rows +
+        meals.map(m => {
           const light = Coach.mealLight(m, T.kcal);
-          return `<div class="panel dcard ${light}" data-id="${m.id}"><div class="noimg">🍽</div><div>
+          return `<div class="panel dcard ${light}" data-kind="meal" data-id="${m.id}"><div class="noimg">🍽</div><div>
             <b><span class="dot ${light}"></span> ${esc(m.name)}</b><p>${m.time} · ${Math.round(m.kcal)} kcal · ${Math.round(m.protein)} g protein</p>
-            ${m.verdict ? `<p>💬 ${esc(m.verdict)}</p>` : ''}${m.tip ? `<p><b style="background:var(--lime);font-size:15px;padding:0 4px;border-radius:4px">Better:</b> ${esc(m.tip)}</p>` : ''}</div></div>`;
+            ${m.verdict ? `<p>💬 ${esc(m.verdict)}</p>` : ''}${m.tip ? `<p><b style="background:var(--lime);font-size:15px;padding:0 4px;border-radius:4px">Better:</b> ${esc(m.tip)}</p>` : ''}</div><span class="edit-hint">✎</span></div>`;
         }).join('');
     }).join('');
     feed.querySelectorAll('.dcard').forEach(c => Services.getThumb(c.dataset.id).then(src => { if (src) c.querySelector('.noimg').outerHTML = `<img src="${src}" alt="">`; }).catch(() => {}));
     const last = Coach.live(state.reports).sort((a, b) => a.id < b.id ? 1 : -1)[0];
     if (last) showReport(last);
   }
+
+  // ---------- recipes and shopping list ----------
+  // Generated recipes stay on this device until saved (♥); saved recipes and the shopping list sync.
+  let draftRecipes = load('lose20.recipeDraft') || [];
+  const AISLES = ['Produce', 'Meat & fish', 'Dairy & eggs', 'Bakery', 'Pantry', 'Frozen', 'Other'];
+  function recipeCard(r, saved) {
+    return `<div class="panel recipe" data-rid="${r.id}">
+      <div class="r-head"><span class="r-slot">${esc(r.slot || '')}</span><b>${esc(r.title)}</b></div>
+      <p class="r-meta">${Math.round(r.kcal || 0)} kcal · ${Math.round(r.protein_g || 0)} g protein · ${Math.round(r.fiber_g || 0)} g fiber · ${r.time_min || '?'} min · serves ${r.servings || 1}</p>
+      ${r.why ? `<p class="r-why">${esc(r.why)}</p>` : ''}
+      <details><summary>Ingredients and steps</summary>
+        <ul>${(r.ingredients || []).map(i => `<li>${esc(i.qty || '')} ${esc(i.item)}</li>`).join('')}</ul>
+        <ol>${(r.steps || []).map(t => `<li>${esc(t)}</li>`).join('')}</ol></details>
+      <div class="inline r-acts"><button class="small" data-act="shop">🛒 Add ingredients</button><button class="small" data-act="save">${saved ? '♥ Saved' : '♡ Save'}</button><button class="small" data-act="eat">🍽 I ate this</button></div>
+    </div>`;
+  }
+  function renderFood() {
+    const saved = Coach.live(state.recipes);
+    const savedIds = new Set(saved.map(r => r.id));
+    const drafts = draftRecipes.filter(r => !savedIds.has(r.id));
+    $('recipeList').innerHTML = (drafts.length ? '<h4 class="sec">New ideas</h4>' + drafts.map(r => recipeCard(r, false)).join('') : '') +
+      (saved.length ? '<h4 class="sec">♥ Saved recipes</h4>' + saved.map(r => recipeCard(r, true)).join('') : '');
+    renderGroceries();
+  }
+  function renderGroceries() {
+    const items = Coach.live(state.groceries);
+    if (!items.length) { $('groList').innerHTML = '<p class="hint">Empty. Add items above or tap 🛒 on a recipe.</p>'; return; }
+    const by = {}; items.forEach(g => (by[g.aisle || 'Other'] = by[g.aisle || 'Other'] || []).push(g));
+    $('groList').innerHTML = AISLES.filter(a => by[a]).map(a => `<div class="aisle">${a}</div>` + by[a].sort((x, y) => (x.done - y.done) || x.item.localeCompare(y.item)).map(g =>
+      `<div class="gro-row${g.done ? ' done' : ''}" data-gid="${g.id}"><input type="checkbox" class="g-done"${g.done ? ' checked' : ''}><input class="g-item" value="${esc(g.item)}"><input class="g-qty" value="${esc(g.qty || '')}" placeholder="qty"><button class="g-del" title="Remove">✕</button></div>`).join('')).join('');
+  }
+  function addGrocery(item, qty, aisle) {
+    item = String(item || '').trim(); if (!item) return null;
+    const ex = Coach.live(state.groceries).find(g => !g.done && g.item.toLowerCase() === item.toLowerCase());
+    if (ex) { if (qty) ex.qty = ex.qty ? ex.qty + ' + ' + qty : qty; ex.updatedAt = Date.now(); return ex; }
+    const g = { id: uid(), item, qty: String(qty || '').trim(), aisle: AISLES.includes(aisle) ? aisle : 'Other', done: false, updatedAt: Date.now() };
+    state.groceries.push(g); return g;
+  }
+  $('mpSlots').onclick = e => { const b = e.target.closest('button'); if (b) b.classList.toggle('on'); };
+  $('mpGo').onclick = async () => {
+    const slots = [...$('mpSlots').querySelectorAll('.on')].map(b => b.dataset.s);
+    if (!slots.length) return toast('Pick at least one meal');
+    const T = A.targets, p = state.profile;
+    $('mpGo').disabled = true; $('mpStatus').textContent = CN() + ' is writing recipes… (about 30 seconds)';
+    try {
+      const list = await Services.planMeals(settings, { count: +$('mpCount').value, slots, notes: $('mpNotes').value.trim(), kcal: T.kcal, protein: T.protein, age: p.age, sex: p.sex,
+        avoid: draftRecipes.concat(Coach.live(state.recipes)).map(r => r.title).slice(-20) });
+      draftRecipes = list.map(r => Object.assign({ id: uid() }, r));
+      localStorage.setItem('lose20.recipeDraft', JSON.stringify(draftRecipes));
+      $('mpStatus').textContent = ''; renderFood();
+      say(`Here are ${list.length} ideas. Save the ones you like and tap the cart to put the ingredients on your list.`, { pose: 'thumbs', bubble: false });
+    } catch (e) { $('mpStatus').textContent = e.message; }
+    $('mpGo').disabled = false;
+  };
+  $('recipeList').onclick = e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const id = b.closest('.recipe').dataset.rid;
+    const r = Coach.live(state.recipes).find(x => x.id === id) || draftRecipes.find(x => x.id === id); if (!r) return;
+    if (b.dataset.act === 'shop') {
+      (r.ingredients || []).forEach(i => addGrocery(i.item, i.qty, i.aisle));
+      saveState(); renderGroceries(); toast(`${(r.ingredients || []).length} ingredients added to your list`);
+      b.textContent = '✓ On your list';
+    } else if (b.dataset.act === 'save') {
+      const s = state.recipes.find(x => x.id === id);
+      if (s && !s.deleted) { s.deleted = true; s.updatedAt = Date.now(); }
+      else if (s) { s.deleted = false; s.updatedAt = Date.now(); }
+      else state.recipes.push(Object.assign({}, r, { updatedAt: Date.now() }));
+      saveState(); renderFood();
+    } else if (b.dataset.act === 'eat') {
+      const before = Gamify.dayPoints(state, today()).total;
+      state.meals.push({ id: uid(), date: today(), time: nowTime(), name: r.title, kcal: Math.round(r.kcal || 0), protein: Math.round(r.protein_g || 0), carbs: Math.round(r.carbs_g || 0),
+        fat: Math.round(r.fat_g || 0), fiber: Math.round(r.fiber_g || 0), score: 8, light: 'green', verdict: '', tip: '', items: [], source: 'recipe', updatedAt: Date.now() });
+      saveState(); refresh(); awardPoints(before); toast('Logged ' + r.title + '. Edit it in the Diary if your portion was different.');
+    }
+  };
+  $('groAddBtn').onclick = () => { if (addGrocery($('groItem').value, $('groQty').value, 'Other')) { $('groItem').value = ''; $('groQty').value = ''; saveState(); renderGroceries(); } $('groItem').focus(); };
+  $('groItem').onkeydown = e => { if (e.key === 'Enter') $('groAddBtn').click(); };
+  $('groList').addEventListener('change', e => {
+    const row = e.target.closest('.gro-row'); if (!row) return;
+    const g = state.groceries.find(x => x.id === row.dataset.gid); if (!g) return;
+    if (e.target.classList.contains('g-done')) g.done = e.target.checked;
+    if (e.target.classList.contains('g-item')) g.item = e.target.value.trim() || g.item;
+    if (e.target.classList.contains('g-qty')) g.qty = e.target.value.trim();
+    g.updatedAt = Date.now(); saveState(); if (e.target.classList.contains('g-done')) renderGroceries();
+  });
+  $('groList').addEventListener('click', e => {
+    if (!e.target.classList.contains('g-del')) return;
+    const g = state.groceries.find(x => x.id === e.target.closest('.gro-row').dataset.gid);
+    if (g) { g.deleted = true; g.updatedAt = Date.now(); saveState(); renderGroceries(); }
+  });
+  $('groClear').onclick = () => { Coach.live(state.groceries).filter(g => g.done).forEach(g => { g.deleted = true; g.updatedAt = Date.now(); }); saveState(); renderGroceries(); };
+  $('groShare').onclick = async () => {
+    const items = Coach.live(state.groceries).filter(g => !g.done);
+    const text = 'Shopping list\n' + AISLES.map(a => { const l = items.filter(g => (g.aisle || 'Other') === a); return l.length ? `\n${a}\n` + l.map(g => `- ${g.item}${g.qty ? ' (' + g.qty + ')' : ''}`).join('\n') : ''; }).join('');
+    try { if (navigator.share) await navigator.share({ title: 'Shopping list', text }); else { await navigator.clipboard.writeText(text); toast('List copied'); } } catch (e) { /* cancelled */ }
+  };
+
+  // ---------- edit any entry ----------
+  let editing = null;   // { kind, obj (null = new) }
+  const fld = (label, id, val, type, extra) => `<label>${label}<input id="${id}" type="${type || 'text'}" value="${esc(val == null ? '' : val)}" ${extra || ''}></label>`;
+  function openEdit(kind, obj) {
+    editing = { kind, obj };
+    const o = obj || {}, isNew = !obj;
+    $('editDelete').hidden = isNew; $('editDelete').textContent = 'Delete'; $('editDelete').dataset.armed = '';
+    let html = '';
+    if (kind === 'meal') {
+      $('editTitle').textContent = isNew ? 'Add a meal' : 'Edit meal';
+      html = fld('Name', 'eName', o.name || '') + `<div class="grid2f">${fld('Date', 'eDate', o.date || today(), 'date')}${fld('Time', 'eTime', o.time || nowTime(), 'time')}</div>
+        <div class="items-edit"><div class="items-head"><span>Item</span><span>Amount</span><span>kcal</span><span></span></div><div id="eItems"></div><button class="small" id="eAddItem">+ Add item</button></div>
+        <div class="grid4">${fld('kcal', 'eKcal', Math.round(o.kcal || 0), 'number')}${fld('Protein', 'eProt', Math.round(o.protein || 0), 'number')}${fld('Carbs', 'eCarb', Math.round(o.carbs || 0), 'number')}${fld('Fat', 'eFat', Math.round(o.fat || 0), 'number')}${fld('Fiber', 'eFib', Math.round(o.fiber || 0), 'number')}</div>`;
+      editing.items = (o.items || []).map(i => ({ food: i.food || '', portion: i.portion || '', kcal: Math.round(i.kcal || 0), color: i.color }));
+    } else if (kind === 'weight') {
+      $('editTitle').textContent = isNew ? 'Add a weigh-in' : 'Edit weigh-in';
+      html = `<div class="grid2f">${fld('Weight (lb)', 'eLb', o.lb || '', 'number', 'step="0.1" inputmode="decimal"')}${fld('Date', 'eDate', o.date || today(), 'date')}</div>`;
+    } else if (kind === 'exercise') {
+      $('editTitle').textContent = isNew ? 'Add exercise' : 'Edit exercise';
+      html = `<label>Activity<select id="eType">${Object.entries(Coach.EXERCISE).map(([k, e]) => `<option value="${k}"${k === (o.type || 'walk') ? ' selected' : ''}>${e.icon} ${e.name}</option>`).join('')}</select></label>
+        <div class="grid2f">${fld('Minutes', 'eMin', o.minutes || 30, 'number')}${fld('Date', 'eDate', o.date || today(), 'date')}</div>
+        <label>Intensity<select id="eInt">${Coach.INTENSITY.map(i => `<option${i === (o.intensity || 'moderate') ? ' selected' : ''}>${i}</option>`).join('')}</select></label><p class="ex-est" id="eEst"></p>`;
+    } else {
+      $('editTitle').textContent = 'Weights + 5k';
+      html = `${fld('Date', 'eDate', o.date || today(), 'date')}<p class="hint">Delete this if you didn't do the workout that day.</p>`;
+    }
+    $('editBody').innerHTML = html;
+    if (kind === 'meal') renderEItems();
+    if (kind === 'exercise') { const up = () => { const k = Coach.exerciseKcal($('eType').value, +$('eMin').value || 0, $('eInt').value, A.nowLb); $('eEst').textContent = `About ${k} kcal burned.`; }; ['eType', 'eMin', 'eInt'].forEach(id => $(id).oninput = $(id).onchange = up); up(); }
+    $('editModal').hidden = false;
+  }
+  function renderEItems() {
+    $('eItems').innerHTML = editing.items.map((i, k) => `<div class="item-row" data-k="${k}"><span class="dot ${i.color || 'yellow'}"></span><input class="i-food" value="${esc(i.food)}" placeholder="Food"><input class="i-qty" value="${esc(i.portion)}" placeholder="Amount"><input class="i-kcal" type="number" value="${i.kcal}"><button class="i-del">✕</button></div>`).join('');
+    $('eAddItem').onclick = () => { editing.items.push({ food: '', portion: '', kcal: 0 }); renderEItems(); };
+    $('eItems').oninput = e => {
+      const row = e.target.closest('.item-row'); if (!row) return; const it = editing.items[+row.dataset.k];
+      if (e.target.classList.contains('i-food')) it.food = e.target.value;
+      if (e.target.classList.contains('i-qty')) { const a = num(it.portion), b = num(e.target.value); if (a && b && a !== b) { it.kcal = Math.round(it.kcal * b / a); row.querySelector('.i-kcal').value = it.kcal; } it.portion = e.target.value; }
+      if (e.target.classList.contains('i-kcal')) it.kcal = +e.target.value || 0;
+      $('eKcal').value = editing.items.reduce((a, i) => a + (+i.kcal || 0), 0);
+    };
+    $('eItems').onclick = e => { if (e.target.classList.contains('i-del')) { editing.items.splice(+e.target.closest('.item-row').dataset.k, 1); renderEItems(); $('eKcal').value = editing.items.reduce((a, i) => a + (+i.kcal || 0), 0); } };
+  }
+  $('editCancel').onclick = () => { $('editModal').hidden = true; editing = null; };
+  $('editSave').onclick = () => {
+    const { kind } = editing, now = Date.now(), d = $('eDate').value && $('eDate').value <= today() ? $('eDate').value : today();
+    let o = editing.obj;
+    const before = Gamify.dayPoints(state, today()).total;
+    if (kind === 'meal') {
+      if (!o) { o = { id: uid(), source: 'manual', verdict: '', tip: '', light: null, score: null }; state.meals.push(o); }
+      Object.assign(o, { name: $('eName').value.trim() || 'Meal', date: d, time: $('eTime').value || nowTime(), kcal: +$('eKcal').value || 0, protein: +$('eProt').value || 0,
+        carbs: +$('eCarb').value || 0, fat: +$('eFat').value || 0, fiber: +$('eFib').value || 0,
+        items: editing.items.filter(i => i.food.trim()).map(i => ({ food: i.food.trim(), portion: i.portion.trim(), kcal: +i.kcal || 0, color: i.color || 'yellow' })), updatedAt: now });
+    } else if (kind === 'weight') {
+      const lb = parseFloat($('eLb').value); if (!(lb > 80 && lb < 400)) return toast('Enter your weight in lb');
+      const clash = state.weights.find(x => x.date === d && !x.deleted && x !== o);
+      if (clash) { clash.deleted = true; clash.updatedAt = now; }                     // one weigh-in per day
+      if (!o) { o = { id: uid() }; state.weights.push(o); }
+      Object.assign(o, { date: d, lb, updatedAt: now });
+    } else if (kind === 'exercise') {
+      const minutes = +$('eMin').value || 0; if (minutes < 1) return toast('Enter the minutes');
+      if (!o) { o = { id: uid(), extra: true, done: true }; state.workouts.push(o); }
+      Object.assign(o, { type: $('eType').value, minutes, intensity: $('eInt').value, date: d, kcal: Coach.exerciseKcal($('eType').value, minutes, $('eInt').value, A.nowLb), updatedAt: now });
+    } else if (o) { Object.assign(o, { date: d, updatedAt: now }); }
+    $('editModal').hidden = true; editing = null; saveState(); refresh(); renderDiary(); awardPoints(before); toast('Saved');
+  };
+  $('editDelete').onclick = () => {
+    const b = $('editDelete');
+    if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Tap again to delete'; return; }
+    editing.obj.deleted = true; editing.obj.updatedAt = Date.now();
+    $('editModal').hidden = true; editing = null; saveState(); refresh(); renderDiary(); toast('Deleted');
+  };
+  $('diaryFeed').addEventListener('click', e => {
+    const c = e.target.closest('[data-kind]'); if (!c) return;
+    const list = { meal: state.meals, weight: state.weights, exercise: state.workouts, routine: state.workouts }[c.dataset.kind];
+    const o = list.find(x => x.id === c.dataset.id); if (o) openEdit(c.dataset.kind, o);
+  });
+  document.querySelector('.add-bar').onclick = e => { const b = e.target.closest('[data-add]'); if (b) openEdit(b.dataset.add, null); };
+
   function showReport(r) {
     $('reportBody').innerHTML = `<div class="grade">${esc(r.grade)}</div><p class="sub">Week ending ${esc(r.id)}</p><p>${esc(r.text)}</p>`;
   }
   $('reportBtn').onclick = async () => {
     const end = Coach.addDays(today(), -1), g = Gamify.weekGrade(state, end);
-    $('reportBtn').disabled = true; $('reportBody').innerHTML = '<p class="hint">Maya is grading your week…</p>';
+    $('reportBtn').disabled = true; $('reportBody').innerHTML = '<p class="hint">' + CN() + ' is grading your week…</p>';
     let text;
     try {
       text = await Services.coachReply(settings, state.profile, Coach.summaryText(state, A),
@@ -588,6 +816,8 @@
       input_schema: { type: 'object', required: ['id'], properties: { id: { type: 'string' }, name: { type: 'string' }, date: { type: 'string' }, time: { type: 'string' },
         kcal: { type: 'number' }, protein_g: { type: 'number' }, carbs_g: { type: 'number' }, fat_g: { type: 'number' }, fiber_g: { type: 'number' },
         items: { type: 'array', items: { type: 'object', properties: { food: { type: 'string' }, portion: { type: 'string' }, kcal: { type: 'number' } } } } } } },
+    { name: 'add_to_shopping_list', description: 'Add items to his shopping list.',
+      input_schema: { type: 'object', required: ['items'], properties: { items: { type: 'array', items: { type: 'object', required: ['item'], properties: { item: { type: 'string' }, qty: { type: 'string' }, aisle: { type: 'string', enum: ['Produce', 'Meat & fish', 'Dairy & eggs', 'Bakery', 'Pantry', 'Frozen', 'Other'] } } } } } } },
     { name: 'delete_entry', description: 'Delete a meal, weigh-in or exercise entry by id.',
       input_schema: { type: 'object', required: ['kind', 'id'], properties: { kind: { type: 'string', enum: ['meal', 'weight', 'exercise'] }, id: { type: 'string' } } } }
   ];
@@ -646,6 +876,10 @@
       if (Array.isArray(x.items)) m.items = x.items.map(i => ({ food: String(i.food || ''), portion: String(i.portion || ''), kcal: r0(i.kcal), color: i.color || 'yellow' }));
       m.updatedAt = now;
       return { result: { ok: true }, action: { text: `✏️ ${m.name} now ${m.kcal} kcal, ${m.protein} g protein`, undo: () => { Object.assign(m, before, { updatedAt: Date.now() }); } } };
+    }
+    if (name === 'add_to_shopping_list') {
+      const added = (x.items || []).map(i => addGrocery(i.item, i.qty, i.aisle)).filter(Boolean);
+      return { result: { ok: true, added: added.length }, action: { text: `🛒 Added ${added.map(g => g.item).join(', ')}`, undo: () => added.forEach(g => { g.deleted = true; g.updatedAt = Date.now(); }) } };
     }
     if (name === 'delete_entry') {
       const list = x.kind === 'meal' ? state.meals : x.kind === 'weight' ? state.weights : state.workouts;
@@ -710,7 +944,7 @@ After the tools, confirm in one short spoken sentence what you did with the calo
   }
   function toggleVoice() {
     settings.voiceOn = !settings.voiceOn; saveSettings(); voiceButtons();
-    if (!settings.voiceOn) { stopTalking(); toast('Maya is muted'); }
+    if (!settings.voiceOn) { stopTalking(); toast(CN() + ' is muted'); }
     else say(document.querySelector('#tab-today.active') ? $('bubble').textContent : "I'm back. Talk to me.", { pose: 'wave', bubble: false });
   }
   $('muteBtn').onclick = toggleVoice;
@@ -797,7 +1031,10 @@ After the tools, confirm in one short spoken sentence what you did with the calo
   applySetup();
   window.addEventListener('hashchange', applySetup);
 
-  window.addEventListener('maya-novoice', () => toast('Maya needs the Azure speech key in Settings to talk'));
+  window.addEventListener('maya-novoice', () => toast(CN() + ' needs the Azure speech key in Settings to talk'));
+
+  $('coachGrid').onclick = e => { const b = e.target.closest('.coach-card'); if (b && b.dataset.id !== coach().id) { switchCoach(b.dataset.id, 'pick'); go('today'); } };
+  $('coachRotate').onchange = e => { state.profile.coachRotate = e.target.checked; state.profile.updatedAt = Date.now(); saveState(); };
 
   // ---------- boot ----------
   if (!localStorage.getItem(SKEY)) saveState();
@@ -813,6 +1050,7 @@ After the tools, confirm in one short spoken sentence what you did with the calo
   } else {
     setTimeout(() => maya.hero.pose('wave', 3000), 400);
   }
+  loadCoaches();
   doSync();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { doSync(); refresh(); } });
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
@@ -824,7 +1062,7 @@ After the tools, confirm in one short spoken sentence what you did with the calo
   let pendingUpdate = null;
   $('appVersion').textContent = 'Version ' + CODE_VERSION;
   function safeToReload() {
-    return !pendingMeal && !rec && !$('chatInput').value && !$('wInput').value && $('planModal').hidden && $('exModal').hidden &&
+    return !pendingMeal && !rec && !$('chatInput').value && !$('wInput').value && $('planModal').hidden && $('exModal').hidden && $('editModal').hidden &&
       !document.querySelector('.msg.typing');
   }
   async function hardReload(v) {

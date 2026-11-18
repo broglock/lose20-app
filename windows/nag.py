@@ -133,7 +133,8 @@ def summarize(state, now):
     gym_done = any(w["date"] == today.isoformat() and w.get("done", True) and not w.get("extra") for w in live(state["workouts"]))
     avg_protein = round(sum(d["protein"] for d in logged) / len(logged)) if logged else None
     return {
-        "name": p.get("name", "David"), "coach": p.get("coachName", "Maya"),
+        "name": p.get("name", "David"), "coach": p.get("coachName", "Maya"), "coach_voice": p.get("coachVoice"),
+        "coach_role": p.get("coachRole", ""), "coach_style": p.get("coachStyle", ""),
         "weight": weight, "lost": round(p["startWeight"] - weight, 1),
         "goal_lb": p["startWeight"] - p["goalWeight"],
         "weighed_today": last_w == today.isoformat(),
@@ -198,11 +199,14 @@ def template_message(s, slot):
 
 
 def claude_message(cfg, s, slot):
+    role_line = (f"Your day job is {s['coach_role'].lower()}, which flavours how you talk, lightly: {s['coach_style']} "
+                 if s.get("coach_role") and s["coach_role"] != "Fitness coach" else "")
     system = (f"You are {s['coach']}, a warm, upbeat, quick-witted fitness and nutrition coach. You are doing a short "
               f"scheduled check-in with {s['name']}, 60, who is losing 20 lb, lifts weights and runs 5 km three times a week. "
               "Be encouraging but direct and a little playful. Point out the most important thing going wrong and one concrete fix. "
               "Evidence you rely on: log every meal, weigh daily and watch the trend, same eating on weekends, breakfast, "
               "high protein to keep muscle, vegetables for volume, few liquid calories. No crash dieting. "
+              f"{role_line}"
               "Never scold. If he has missed days of logging, be warm, skip the guilt, and ask for one small action right now. "
               "Ask for only one thing per check-in. "
               "This is spoken aloud: 2 or 3 short sentences, no lists, no emoji, no markdown.")
@@ -218,9 +222,9 @@ def claude_message(cfg, s, slot):
 
 
 # ---------------------------------------------------------------- voice and window
-def speak(cfg, text):
+def speak(cfg, text, voice=None):
     from xml.sax.saxutils import escape
-    voice = cfg.get("azure_voice", "en-US-AvaMultilingualNeural")
+    voice = voice or cfg.get("azure_voice") or "en-US-AvaMultilingualNeural"
     ssml = f'<speak version="1.0" xml:lang="en-US"><voice name="{voice}">{escape(text)}</voice></speak>'
     audio = http(f"https://{cfg['azure_region']}.tts.speech.microsoft.com/cognitiveservices/v1", "POST",
                  {"Ocp-Apim-Subscription-Key": cfg["azure_key"], "Content-Type": "application/ssml+xml",
@@ -335,7 +339,7 @@ def main():
         open_window(cfg, msg)
     if not a.no_voice and cfg.get("azure_key"):
         try:
-            speak(cfg, msg)
+            speak(cfg, msg, (s.get("coach_voice") if state else None))
         except Exception as e:
             log(f"voice failed: {e}")
 

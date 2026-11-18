@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/maya-a-icon-192.png">
 <link rel="preload" href="fonts/caveat-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/patrick-hand-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="styles.css?v=1.6.0">
+<link rel="stylesheet" href="styles.css?v=1.7.0">
 </head>
 <body>
 <header class="top">
@@ -30,7 +30,7 @@
         <div class="acts"><button class="small voice-btn" id="hearBtn">🔊 Voice on</button><button class="small" id="tipBtn">Another tip</button></div>
       </div>
     </div>
-    <p class="tap-hint" id="tapHint">Tap Maya to talk to her</p>
+    <p class="tap-hint" id="tapHint">Tap <span class="cn">Maya</span> to talk to her</p>
     <button id="nextBtn" class="next-btn">🧭 What should I do next?</button>
 
     <div class="panel peach" id="comeback" hidden>
@@ -97,7 +97,7 @@
       <span class="doodle">🧠</span>
       <h3>My if-then plans</h3>
       <ul id="plans"></ul>
-      <button class="small" id="pickPlans">+ Pick plans with Maya</button>
+      <button class="small" id="pickPlans">+ Pick plans with <span class="cn">Maya</span></button>
     </div>
 
     <div class="panel">
@@ -113,7 +113,7 @@
         <label class="big-btn">📷 Camera<input id="camInput" type="file" accept="image/*" capture="environment" hidden></label>
         <label class="big-btn alt">🖼 Gallery<input id="galInput" type="file" accept="image/*" hidden></label>
       </div>
-      <div class="shot" id="shot" hidden><img id="preview" alt="Meal photo"><span class="scan-label">Maya is looking…</span></div>
+      <div class="shot" id="shot" hidden><img id="preview" alt="Meal photo"><span class="scan-label"><span class="cn">Maya</span> is looking…</span></div>
       <input id="mealNote" placeholder="Note for Maya: large portion, ranch dressing…">
       <button id="analyzeBtn" class="primary" hidden>Analyze again</button>
       <details>
@@ -154,12 +154,34 @@
     </div>
   </section>
 
+  <section id="tab-food" class="tab">
+    <div class="panel mint">
+      <span class="doodle">👩‍🍳</span>
+      <h3>Meal ideas and recipes</h3>
+      <p class="sub">Recipes sized to your calorie and protein targets. Add the ingredients of the ones you like to your shopping list.</p>
+      <div class="seg" id="mpSlots"><button data-s="breakfast" class="on">Breakfast</button><button data-s="lunch" class="on">Lunch</button><button data-s="dinner" class="on">Dinner</button><button data-s="snack">Snack</button></div>
+      <label>How many recipes<select id="mpCount"><option>3</option><option selected>6</option><option>9</option></select></label>
+      <label>Likes, dislikes, what's in the fridge<input id="mpNotes" placeholder="e.g. no fish, love Mexican, have chicken thighs"></label>
+      <button class="primary" id="mpGo">✨ Get recipes</button> <span id="mpStatus" class="hint"></span>
+    </div>
+    <div id="recipeList"></div>
+    <div class="panel butter" id="groceryPanel">
+      <span class="doodle">🛒</span>
+      <h3>Shopping list</h3>
+      <div class="inline gro-add"><input id="groItem" placeholder="Add an item"><input id="groQty" placeholder="Qty" style="max-width:90px"><button id="groAddBtn">Add</button></div>
+      <div id="groList"></div>
+      <div class="inline" style="margin-top:8px;flex-wrap:wrap"><button class="small" id="groClear">Remove ticked items</button><button class="small" id="groShare">Share / copy list</button></div>
+    </div>
+  </section>
+
   <section id="tab-diary" class="tab">
     <div class="panel butter" id="reportCard">
       <h3>Weekly report card</h3>
-      <div id="reportBody"><p class="hint">Maya grades your last 7 days and tells you what to fix.</p></div>
+      <div id="reportBody"><p class="hint"><span class="cn">Maya</span> grades your last 7 days and tells you what to fix.</p></div>
       <button class="small" id="reportBtn">Get my report card</button>
     </div>
+    <div class="add-bar"><span>Add for any day:</span><button class="small" data-add="meal">🍽 Meal</button><button class="small" data-add="weight">⚖️ Weigh-in</button><button class="small" data-add="exercise">🏃 Exercise</button></div>
+    <p class="hint" style="margin:0 4px">Tap any entry to change or delete it.</p>
     <div id="diaryFeed"></div>
   </section>
 
@@ -235,10 +257,17 @@
       <label>Token<input id="sGhToken" type="password" autocomplete="off"></label>
     </div>
     <div class="panel">
-      <h3>Maya's voice</h3>
+      <h3>Your coach</h3>
+      <p class="sub">Tap a coach to switch. Each has her own voice and style.</p>
+      <div id="coachGrid" class="coach-grid"></div>
+      <label class="check"><input type="checkbox" id="coachRotate"> A new coach takes over every week</label>
+    </div>
+    <div class="panel">
+      <h3>Voice</h3>
       <label>Azure Speech key<input id="sAzKey" type="password" autocomplete="off"></label>
       <label>Region<input id="sAzRegion" placeholder="eastus"></label>
       <label>Voice<select id="sVoice">
+        <option value="">Each coach's own voice</option>
         <option value="en-US-AvaMultilingualNeural">Ava (warm)</option>
         <option value="en-US-Ava:DragonHDLatestNeural">Ava HD (most natural)</option>
         <option value="en-US-EmmaMultilingualNeural">Emma (bright)</option>
@@ -262,14 +291,15 @@
   <button data-go="today" class="active">🏠<span>Today</span></button>
   <button data-go="log">📸<span>Snap</span></button>
   <button data-go="diary">📔<span>Diary</span></button>
+  <button data-go="food">🛒<span>Food</span></button>
   <button data-go="progress">📈<span>Progress</span></button>
-  <button data-go="maya">💬<span>Maya</span></button>
+  <button data-go="maya">💬<span class="cn">Maya</span></button>
 </nav>
 
 <div class="modal" id="planModal" hidden>
   <div class="panel butter">
     <h3>If-then plans</h3>
-    <p class="sub">Specific "if this happens, then I do that" plans are one of the best-tested tools for changing eating habits. Maya picked these for your weak spots. Choose 1 to 3.</p>
+    <p class="sub">Specific "if this happens, then I do that" plans are one of the best-tested tools for changing eating habits. <span class="cn">Maya</span> picked these for your weak spots. Choose 1 to 3.</p>
     <div id="planChoices"></div>
     <div class="inline" style="margin-top:10px"><button class="primary" id="savePlans">Save plans</button><button id="closePlans">Cancel</button></div>
   </div>
@@ -278,7 +308,7 @@
 <div class="modal" id="exModal" hidden>
   <div class="panel butter">
     <h3>Log exercise</h3>
-    <p class="sub">Your planned weights + 5k is already counted in your calories, so use the checkbox for that. Log anything extra here: Maya adds back half of what it burns to today's budget.</p>
+    <p class="sub">Your planned weights + 5k is already counted in your calories, so use the checkbox for that. Log anything extra here: your coach adds back half of what it burns to today's budget.</p>
     <div id="exTypes" class="ex-types"></div>
     <div class="grid2f">
       <label>Minutes<input id="exMin" type="number" inputmode="numeric" min="5" max="300" value="30"></label>
@@ -290,17 +320,25 @@
   </div>
 </div>
 
+<div class="modal" id="editModal" hidden>
+  <div class="panel">
+    <h3 id="editTitle">Edit</h3>
+    <div id="editBody"></div>
+    <div class="inline edit-acts"><button class="primary" id="editSave">Save</button><button id="editCancel">Cancel</button><button id="editDelete" class="danger">Delete</button></div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
-<script src="version.js?v=1.6.0"></script>
-<script src="coach.js?v=1.6.0"></script>
-<script src="gamify.js?v=1.6.0"></script>
-<script src="tips.js?v=1.6.0"></script>
-<script src="avatar.js?v=1.6.0"></script>
-<script src="charts.js?v=1.6.0"></script>
-<script src="fx.js?v=1.6.0"></script>
-<script src="services.js?v=1.6.0"></script>
-<script src="photomaya.js?v=1.6.0"></script>
-<script src="app.js?v=1.6.0"></script>
+<script src="version.js?v=1.7.0"></script>
+<script src="coach.js?v=1.7.0"></script>
+<script src="gamify.js?v=1.7.0"></script>
+<script src="tips.js?v=1.7.0"></script>
+<script src="avatar.js?v=1.7.0"></script>
+<script src="charts.js?v=1.7.0"></script>
+<script src="fx.js?v=1.7.0"></script>
+<script src="services.js?v=1.7.0"></script>
+<script src="photomaya.js?v=1.7.0"></script>
+<script src="app.js?v=1.7.0"></script>
 </body>
 </html>

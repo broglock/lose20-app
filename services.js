@@ -72,7 +72,8 @@ Return ONLY a JSON object with the same fields as: {"name","items":[{"food","por
   }
 
   function coachSystem(profile, summary, desk) {
-    return `You are ${profile.coachName}, a warm, upbeat, quick-witted personal fitness and nutrition coach. You are coaching ${profile.name}, who is trying to lose 20 lb.
+    return `You are ${profile.coachName}, a warm, upbeat, quick-witted personal fitness and nutrition coach. You are coaching ${profile.name}, who is trying to lose 20 lb.${profile.coachRole && profile.coachRole !== 'Fitness coach' ? `
+Your day job is ${profile.coachRole.toLowerCase()}, and it colours how you talk: ${profile.coachStyle || ''} Keep the job flavour light, one touch per reply at most.` : ''}
 He lifts weights and runs 5 km three times a week. Your style: encouraging but direct, a bit playful, never preachy, never shaming. Call out what is going wrong plainly and give one concrete fix.
 Base advice on evidence: daily food logging, daily weigh-ins watching the trend, a consistent eating pattern on weekdays and weekends, breakfast, high protein (1.2-1.6 g/kg) to keep muscle at his age, vegetables and fiber for volume, limited liquid calories and alcohol, home cooking.
 Do not recommend crash diets, skipping meals, or going below the calorie target by large amounts. If he mentions chest pain, dizziness or other medical symptoms, tell him to see a doctor.
@@ -86,6 +87,15 @@ ${summary}`;
     const msgs = history.slice(-12);
     while (msgs.length && msgs[0].role !== 'user') msgs.shift();   // API needs a user turn first
     return claude(settings, msgs, coachSystem(profile, summary, desk), 2000);
+  }
+
+  // Meal ideas with full recipes, sized to his targets.
+  async function planMeals(settings, o) {
+    const prompt = `Create ${o.count} healthy recipes for a ${o.age}-year-old ${o.sex} losing weight while lifting weights. Daily targets: ${o.kcal} kcal, ${o.protein} g protein, 30 g fiber.
+Meals wanted: ${o.slots.join(', ')}. Size each recipe so a day of these meals fits the calorie target (roughly breakfast 22%, lunch 30%, dinner 33%, snack 10%), high in protein, lots of vegetables, simple home cooking, common supermarket ingredients, mostly 30 minutes or less.
+${o.notes ? 'His preferences: ' + o.notes + '\n' : ''}${o.avoid && o.avoid.length ? 'Do not repeat these recent recipes: ' + o.avoid.join('; ') + '\n' : ''}Return ONLY a JSON object: {"recipes":[{"title":string,"slot":"breakfast|lunch|dinner|snack","servings":number,"time_min":number,"kcal":number per serving,"protein_g":number,"carbs_g":number,"fat_g":number,"fiber_g":number,"why":"one short sentence on why it helps him","ingredients":[{"item":string,"qty":string for all servings,"aisle":"Produce|Meat & fish|Dairy & eggs|Bakery|Pantry|Frozen|Other"}],"steps":[string, 3-7 short steps]}]}`;
+    const text = await claude(settings, [{ role: 'user', content: prompt }], undefined, 16000);
+    return extractJson(text).recipes || [];
   }
 
   // Chat with tools: Maya can add, change and delete log entries when asked.
@@ -248,5 +258,5 @@ ${summary}`;
     });
   }
 
-  root.Services = { analyzeMealPhoto, analyzeMealText, coachReply, coachAct, speak, stopSpeaking, onSpeaking, isSpeaking, listen, sync, ghPull, putThumb, getThumb, resizeImage };
+  root.Services = { analyzeMealPhoto, analyzeMealText, coachReply, coachAct, planMeals, speak, stopSpeaking, onSpeaking, isSpeaking, listen, sync, ghPull, putThumb, getThumb, resizeImage };
 })(self);

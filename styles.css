@@ -285,3 +285,41 @@ body.desk .maya-box.big.pmaya{max-width:380px}
 .msg.actions{background:none;border:none;box-shadow:none;padding:0;max-width:96%}
 .act-row{display:flex;align-items:center;gap:8px;justify-content:space-between;background:#e6f6ea;border:2px solid var(--ink);border-radius:12px;padding:4px 8px;margin:4px 0;font-size:15px}
 .act-row.undone{background:#eee;opacity:.7}
+
+/* coach picker */
+.coach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin:8px 0}
+.coach-card{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;background:var(--card);border-radius:14px}
+.coach-card img{width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--ink)}
+.coach-card b{font-size:16px}
+.coach-card small{font-size:12px;opacity:.75;line-height:1.1;text-align:center}
+.coach-card.on{background:var(--teal);color:#fff}
+.coach-card.on img{border-color:#fff;box-shadow:0 0 0 3px var(--teal)}
+
+/* diary editing */
+.add-bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:10px 0 4px}
+.add-bar span{font-size:15px;opacity:.8}
+.drow{padding:8px 12px;margin:6px 0;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:16px}
+.dcard{cursor:pointer;position:relative}
+.edit-hint{margin-left:auto;opacity:.45;font-size:15px}
+.dcard .edit-hint{position:absolute;right:10px;top:8px}
+.edit-acts{flex-wrap:wrap;margin-top:10px}
+.danger{background:#fbe3e3;color:#a33}
+
+/* recipes and shopping list */
+.sec{margin:14px 4px 0;font-size:20px}
+.recipe .r-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.recipe .r-head b{font-size:20px}
+.r-slot{font-size:12px;text-transform:uppercase;background:var(--butter);border:1.5px solid var(--ink);border-radius:999px;padding:0 7px}
+.r-meta{margin:4px 0;font-size:15px;opacity:.8}
+.r-why{margin:4px 0}
+.recipe details{margin:6px 0}
+.recipe summary{cursor:pointer;font-weight:700}
+.recipe ul,.recipe ol{margin:6px 0;padding-left:22px}
+.r-acts{flex-wrap:wrap;gap:6px}
+.gro-add input{min-width:0}
+.aisle{margin:10px 0 2px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;opacity:.7}
+.gro-row{display:grid;grid-template-columns:26px 1fr 84px 28px;gap:6px;align-items:center;margin:3px 0}
+.gro-row input[type=checkbox]{width:22px;height:22px}
+.gro-row input{min-width:0;padding:5px 7px;font-size:16px}
+.gro-row.done .g-item{text-decoration:line-through;opacity:.55}
+.gro-row .g-del{background:none;border:none;box-shadow:none;color:#a33;padding:0}
