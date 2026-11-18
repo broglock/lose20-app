@@ -1,5 +1,5 @@
 // Offline cache for the app shell. Bump VERSION after editing any app file.
-const VERSION = 'lose20-1.5.0';
+const VERSION = 'lose20-1.5.1';
 const FILES = ['./', 'index.html', 'version.js', 'styles.css', 'app.js', 'coach.js', 'gamify.js', 'tips.js', 'avatar.js', 'charts.js', 'fx.js', 'services.js', 'photomaya.js', 'maya/maya-frames.json', 'maya/maya-base.jpg', 'maya/maya-blink.jpg', 'manifest.webmanifest', 'icons/maya-a-icon-192.png', 'icons/maya-a-icon-512.png', 'fonts/caveat-latin-700-normal.woff2', 'fonts/caveat-latin-500-normal.woff2', 'fonts/patrick-hand-latin-400-normal.woff2'];
 self.addEventListener('install', e => e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim())));

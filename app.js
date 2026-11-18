@@ -686,6 +686,8 @@
   applySetup();
   window.addEventListener('hashchange', applySetup);
 
+  window.addEventListener('maya-novoice', () => toast('Maya needs the Azure speech key in Settings to talk'));
+
   // ---------- boot ----------
   if (!localStorage.getItem(SKEY)) saveState();
   voiceButtons();

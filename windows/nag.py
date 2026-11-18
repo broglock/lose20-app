@@ -243,6 +243,14 @@ def find_edge():
 
 def open_window(cfg, msg):
     url = cfg["app_url"].split("?")[0] + "?desk=1&msg=" + urllib.parse.quote(msg)
+    # Hand the keys to the Edge window too (its storage is separate from the phone), so it shows your
+    # synced data and talks in Maya's neural voice instead of the Windows text-to-speech voice.
+    # The part after # never leaves this PC; the app saves it and clears it from the address bar.
+    keys = {"key": cfg.get("anthropic_key"), "repo": cfg.get("github_repo"), "gh": cfg.get("github_token"),
+            "az": cfg.get("azure_key"), "region": cfg.get("azure_region")}
+    keys = {k: v for k, v in keys.items() if v and "..." not in v}
+    if keys:
+        url += "#setup&" + urllib.parse.urlencode(keys)
     edge = find_edge()
     if edge:
         subprocess.Popen([edge, f"--app={url}", "--window-size=1100,820"])

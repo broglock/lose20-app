@@ -1,8 +1,8 @@
 {
-  "version": "1.5.0",
+  "version": "1.5.1",
   "released": "2026-11-18",
   "windows": {
-    "nag.py": "7fefc650051e7cbc107194bfeb331cd76e20cb5a6abacab7e581e140a470ea96",
+    "nag.py": "fc5d9bcc6827d4a96730c91f16ad4c3b497a8ad503515116284db18697c626e0",
     "install_tasks.ps1": "d67456e74a851e0c8828412ba0a4e173866a7ea74728d5028d37cf37d5de71b4",
     "config.example.json": "bb65115626b23a9ed1984d899569b8f8175f941dc1428ef3be9e8957e040a4e7"
   }

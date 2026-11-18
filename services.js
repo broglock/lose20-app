@@ -77,7 +77,7 @@ ${summary}`;
   }
 
   // ---------------- Voice (Azure neural) ----------------
-  let audioEl = null, gen = 0, speaking = false;
+  let audioEl = null, gen = 0, speaking = false, warnedNoVoice = false;
   const speakListeners = [];
   function setSpeaking(v) { if (speaking !== v) { speaking = v; speakListeners.forEach(f => f(v)); } }
   function esc(s) { return s.replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c])); }
@@ -110,7 +110,11 @@ ${summary}`;
       } catch (e) {
         if (my !== gen) { end && end(); return; } console.warn('Azure voice failed, using device voice', e); }
     }
-    // Fallback: device voice, so the app still talks without an Azure key.
+    // The robotic device voice is off unless chosen in Settings: no Azure voice means Maya stays quiet.
+    if (!settings.deviceVoice) {
+      if (!settings.azureKey && !warnedNoVoice) { warnedNoVoice = true; root.dispatchEvent && root.dispatchEvent(new CustomEvent('maya-novoice')); }
+      onEnd && onEnd(); return;
+    }
     if ('speechSynthesis' in window) {
       const u = new SpeechSynthesisUtterance(text);
       const v = speechSynthesis.getVoices().find(v => /female|zira|aria|jenny|samantha|google us english/i.test(v.name));
