@@ -174,7 +174,7 @@ void main(){
     }
     function crop() {
       const S = assets.meta.size, W = cv.width, H = cv.height, c = assets.meta.crop;
-      let sw = S * 0.62, sh = sw * H / W; if (sh > S) { sh = S; sw = S * W / H; }
+      let sw = S * (assets.meta.view || 0.62), sh = sw * H / W; if (sh > S) { sh = S; sw = S * W / H; }
       return [Math.max(0, Math.min(S - sw, c[0] - sw / 2)), Math.max(0, Math.min(S - sh, c[1] - sh * 0.45)), sw, sh];
     }
     function synthLevel(t) {

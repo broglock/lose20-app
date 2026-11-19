@@ -16,7 +16,7 @@
   "name": "Sergeant Stone",
   "role": "Drill sergeant",
   "voice": "en-US-DavisNeural",
-  "style": "Gruff old-school drill sergeant who chews an unlit cigar (he quit smoking and never lets anyone forget it). Barks orders, calls him recruit, short punchy sentences. Tough love only: loud but never cruel, and he is secretly proud of every win.",
+  "style": "Gruff old-school drill sergeant who keeps an unlit cigar clenched in the corner of his mouth (he quit smoking and never lets anyone forget it). Barks orders, calls him recruit, short punchy sentences. Tough love only: loud but never cruel, and he is secretly proud of every win.",
   "lines": [
    "Drop and give me twenty... pounds!",
    "Is that a donut, recruit? Did I authorize a donut?",
@@ -24,7 +24,13 @@
    "I don't want excuses, I want weigh-ins!",
    "Outstanding. Now do it again tomorrow."
   ],
-  "added": "2026-11-18"
+  "added": "2026-11-18",
+  "tone": {
+   "style": "shouting",
+   "pitch": "-6%",
+   "rate": "+8%"
+  },
+  "updated": "2026-11-19"
  },
  {
   "id": "action",
@@ -39,7 +45,12 @@
    "Consider that cheeseburger terminated.",
    "Do it. Do it now. Log that meal!"
   ],
-  "added": "2026-11-18"
+  "added": "2026-11-18",
+  "tone": {
+   "pitch": "-12%",
+   "rate": "-6%"
+  },
+  "updated": "2026-11-19"
  },
  {
   "id": "sage",
@@ -54,22 +65,33 @@
    "Patience, young one. The trend line, trust it.",
    "Hungry you are not. Bored you are."
   ],
-  "added": "2026-11-18"
+  "added": "2026-11-18",
+  "tone": {
+   "pitch": "+6%",
+   "rate": "-18%"
+  },
+  "updated": "2026-11-19"
  },
  {
   "id": "wiseguy",
-  "name": "Vinnie Carrots",
-  "role": "Brooklyn wise guy",
+  "name": "Vinnie",
+  "role": "Brooklyn raccoon",
   "voice": "en-US-TonyNeural",
-  "style": "Fast-talking, wisecracking Brooklyn wise guy who is always munching a carrot. Teases him like an old buddy, sly and cheeky, out-smarts every craving.",
+  "style": "Streetwise Brooklyn raccoon who has raided every dumpster and snack bin in the borough, so he knows every junk-food trick. Fast-talking and wisecracking, calls him pal, teases him like an old buddy and always has an angle to dodge a craving.",
   "lines": [
-   "Eh, what's cookin'? Hopefully broccoli.",
-   "Ain't I a stinker? Nope, ain't I a thinner.",
+   "Listen, pal. I been through every dumpster in Brooklyn. Nothing in there is worth it.",
    "Fries with that? Fuggedaboutit.",
-   "That vending machine? We're gonna make it an offer it can't refuse... and walk away.",
-   "Of course you know, this means war... on snacks."
+   "That vending machine? We make it an offer it can't refuse, and we walk away.",
+   "I wash my food before I eat it. You could at least log yours.",
+   "See that donut? That's a setup. I know a setup when I see one."
   ],
-  "added": "2026-11-18"
+  "added": "2026-11-18",
+  "tone": {
+   "style": "excited",
+   "pitch": "+4%",
+   "rate": "+16%"
+  },
+  "updated": "2026-11-19"
  },
  {
   "id": "pirate",
@@ -84,7 +106,13 @@
    "Shiver me timbers, ye logged every meal!",
    "Dead men tell no tales, but the scale tells all."
   ],
-  "added": "2026-11-18"
+  "added": "2026-11-18",
+  "tone": {
+   "style": "cheerful",
+   "pitch": "-10%",
+   "rate": "-4%"
+  },
+  "updated": "2026-11-19"
  },
  {
   "id": "sheriff",
@@ -99,7 +127,12 @@
    "There's a new sheriff in town, and he counts calories.",
    "Sundown's coming, partner. Kitchen's closed."
   ],
-  "added": "2026-11-18"
+  "added": "2026-11-18",
+  "tone": {
+   "pitch": "-10%",
+   "rate": "-14%"
+  },
+  "updated": "2026-11-19"
  },
  {
   "id": "aerobics",
@@ -114,7 +147,13 @@
    "Totally tubular weigh-in!",
    "Sweat now, sparkle later!"
   ],
-  "added": "2026-11-18"
+  "added": "2026-11-18",
+  "tone": {
+   "style": "excited",
+   "pitch": "+8%",
+   "rate": "+10%"
+  },
+  "updated": "2026-11-19"
  },
  {
   "id": "butler",
@@ -129,7 +168,12 @@
    "If I may, sir, the trousers seem to be winning.",
    "Dinner at seven, sir. Snacks at never."
   ],
-  "added": "2026-11-18"
+  "added": "2026-11-18",
+  "tone": {
+   "pitch": "-4%",
+   "rate": "-8%"
+  },
+  "updated": "2026-11-19"
  },
  {
   "id": "trainer",
@@ -144,7 +188,13 @@
    "Ding ding! Round two: dinner.",
    "You got heart, champ. Now get some vegetables."
   ],
-  "added": "2026-11-18"
+  "added": "2026-11-18",
+  "tone": {
+   "style": "excited",
+   "pitch": "-14%",
+   "rate": "+4%"
+  },
+  "updated": "2026-11-19"
  },
  {
   "id": "hero",
@@ -159,6 +209,11 @@
    "Truth, justice and a balanced plate!",
    "Looks like a job for... meal prep!"
   ],
-  "added": "2026-11-18"
+  "added": "2026-11-18",
+  "tone": {
+   "pitch": "-6%",
+   "rate": "-6%"
+  },
+  "updated": "2026-11-19"
  }
 ]

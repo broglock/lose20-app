@@ -168,7 +168,12 @@ ${o.notes ? 'His preferences: ' + o.notes + '\n' : ''}${o.excludeIngredients && 
     if (settings.azureKey && settings.azureRegion) {
       try {
         const voice = settings.voice || 'en-US-AvaMultilingualNeural';
-        const ssml = `<speak version="1.0" xml:lang="en-US"><voice name="${voice}"><prosody rate="${settings.voiceRate || '0%'}">${esc(text)}</prosody></voice></speak>`;
+        // A coach's tone adds an Azure speaking style (shouting, excited...) plus pitch and pace.
+        const t = settings.tone || {};
+        const rate = settings.voiceRate && settings.voiceRate !== '0%' ? settings.voiceRate : (t.rate || '0%');
+        let inner = `<prosody rate="${esc(rate)}" pitch="${esc(t.pitch || '0%')}">${esc(text)}</prosody>`;
+        if (t.style) inner = `<mstts:express-as style="${esc(t.style)}"${t.degree ? ` styledegree="${t.degree}"` : ''}>${inner}</mstts:express-as>`;
+        const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US"><voice name="${voice}">${inner}</voice></speak>`;
         const r = await fetch(`https://${settings.azureRegion}.tts.speech.microsoft.com/cognitiveservices/v1`, {
           method: 'POST',
           headers: { 'Ocp-Apim-Subscription-Key': settings.azureKey, 'Content-Type': 'application/ssml+xml', 'X-Microsoft-OutputFormat': 'audio-24khz-96kbitrate-mono-mp3' },

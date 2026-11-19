@@ -267,10 +267,14 @@ def push_usage(cfg):
 
 
 # ---------------------------------------------------------------- voice and window
-def speak(cfg, text, voice=None, rate=None):
-    from xml.sax.saxutils import escape
+def speak(cfg, text, voice=None, rate=None, pitch=None, style=None):
+    from xml.sax.saxutils import escape, quoteattr
     voice = voice or cfg.get("azure_voice") or "en-US-AvaMultilingualNeural"
-    ssml = f'<speak version="1.0" xml:lang="en-US"><voice name="{voice}"><prosody rate="{escape(rate or "0%")}">{escape(text)}</prosody></voice></speak>'
+    inner = f'<prosody rate={quoteattr(rate or "0%")} pitch={quoteattr(pitch or "0%")}>{escape(text)}</prosody>'
+    if style:   # coach's Azure speaking style, e.g. the sergeant shouts
+        inner = f'<mstts:express-as style={quoteattr(style)}>{inner}</mstts:express-as>'
+    ssml = ('<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" '
+            f'xml:lang="en-US"><voice name={quoteattr(voice)}>{inner}</voice></speak>')
     audio = http(f"https://{cfg['azure_region']}.tts.speech.microsoft.com/cognitiveservices/v1", "POST",
                  {"Ocp-Apim-Subscription-Key": cfg["azure_key"], "Content-Type": "application/ssml+xml",
                   "X-Microsoft-OutputFormat": "riff-24khz-16bit-mono-pcm", "User-Agent": "lose20"},
@@ -386,7 +390,9 @@ def main():
     if not a.no_voice and cfg.get("azure_key"):
         try:
             prefs = (state or {}).get("prefs") or {}     # voice picked in the app, synced from phone or PC
-            speak(cfg, msg, prefs.get("voice") or (s.get("coach_voice") if state else None), prefs.get("voiceRate"))
+            tone = {} if prefs.get("voice") else (((state or {}).get("profile") or {}).get("coachTone") or {})
+            rate = prefs.get("voiceRate") if prefs.get("voiceRate") not in (None, "", "0%") else tone.get("rate")
+            speak(cfg, msg, prefs.get("voice") or (s.get("coach_voice") if state else None), rate, tone.get("pitch"), tone.get("style"))
         except Exception as e:
             log(f"voice failed: {e}")
     try:
