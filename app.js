@@ -18,12 +18,28 @@
   ['weights', 'meals', 'workouts', 'plans', 'planChecks', 'reports', 'groceries', 'recipes', 'usage'].forEach(k => { if (!Array.isArray(state[k])) state[k] = []; });
   let settings = Object.assign({ voiceOn: true, model: 'claude-sonnet-5-5', voice: '' }, load(KKEY) || {});
   if (!settings.voiceV2) { settings.voice = ''; settings.voiceV2 = 1; }   // default: each coach's own voice
+  // First run with synced prefs: seed from this device with updatedAt 0, so the first real change on either device wins.
+  if (!state.prefs || typeof state.prefs !== 'object' || Array.isArray(state.prefs)) {
+    state.prefs = { updatedAt: 0 };
+    ['voice', 'voiceRate', 'deviceVoice', 'avatarOn', 'model', 'prices'].forEach(k => { if (settings[k] !== undefined) state.prefs[k] = settings[k]; });
+  }
   let celebrated = load(CKEY) || {};
   let A = null, chatHistory = [], pendingMeal = null, rec = null, tipSeed = 0;
 
   function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
   function saveState() { localStorage.setItem(SKEY, JSON.stringify(state)); scheduleSync(); }
-  function saveSettings() { localStorage.setItem(KKEY, JSON.stringify(settings)); }
+  // Preferences that sync between phone and PC through state.prefs. Keys, tokens, deviceId and mute stay on each device.
+  const SYNCED = ['voice', 'voiceRate', 'deviceVoice', 'avatarOn', 'model', 'prices'];
+  const prefSig = () => JSON.stringify(SYNCED.map(k => settings[k]));
+  function pullPrefs() {
+    SYNCED.forEach(k => { if (k in state.prefs) settings[k] = state.prefs[k]; });
+    localStorage.setItem(KKEY, JSON.stringify(settings));
+  }
+  function saveSettings() {
+    localStorage.setItem(KKEY, JSON.stringify(settings));
+    const changed = SYNCED.filter(k => settings[k] !== undefined && JSON.stringify(settings[k]) !== JSON.stringify(state.prefs[k]));
+    if (changed.length) { changed.forEach(k => { state.prefs[k] = settings[k]; }); state.prefs.updatedAt = Date.now(); saveState(); }
+  }
   function saveCelebrated() { localStorage.setItem(CKEY, JSON.stringify(celebrated)); }
   function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2800); }
 
@@ -170,6 +186,10 @@
     try {
       state = await Services.sync(settings, state);
       localStorage.setItem(SKEY, JSON.stringify(state));
+      if (state.prefs) {
+        const before = prefSig(); pullPrefs();
+        if (prefSig() !== before) { applyLiveMode(); if ($('sVoice')) $('sVoice').value = settings.voice || ''; }
+      }
       $('syncDot').className = 'sync-dot ok'; $('syncBtn').title = 'Synced ' + nowTime();
       refresh();
     } catch (e) { $('syncDot').className = 'sync-dot bad'; $('syncBtn').title = e.message; if (manual) toast(e.message); }
@@ -1105,6 +1125,7 @@ After the tools, confirm in one short spoken sentence what you did with the calo
 
   // ---------- boot ----------
   if (!localStorage.getItem(SKEY)) saveState();
+  pullPrefs();
   voiceButtons();
   applyLiveMode();
   if (DESK) document.body.classList.add('desk');

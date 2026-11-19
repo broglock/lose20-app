@@ -399,8 +399,12 @@
     if (!local) return remote;
     const out = { version: 1, profile: (remote.profile.updatedAt || 0) > (local.profile.updatedAt || 0) ? remote.profile : local.profile };
     // Every array field merges record by record, so new record types sync without code changes.
+    // Object fields with an updatedAt (profile, prefs) keep whichever side changed last.
+    const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
     new Set(Object.keys(local).concat(Object.keys(remote))).forEach(k => {
-      if (Array.isArray(local[k]) || Array.isArray(remote[k])) out[k] = mergeArrays(local[k], remote[k]);
+      const l = local[k], r = remote[k];
+      if (Array.isArray(l) || Array.isArray(r)) out[k] = mergeArrays(l, r);
+      else if (k !== 'profile' && (isObj(l) || isObj(r))) out[k] = !isObj(l) ? r : !isObj(r) ? l : (r.updatedAt || 0) >= (l.updatedAt || 0) ? r : l;   // tie goes to remote so devices settle
     });
     return out;
   }

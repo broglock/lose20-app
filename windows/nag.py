@@ -267,10 +267,10 @@ def push_usage(cfg):
 
 
 # ---------------------------------------------------------------- voice and window
-def speak(cfg, text, voice=None):
+def speak(cfg, text, voice=None, rate=None):
     from xml.sax.saxutils import escape
     voice = voice or cfg.get("azure_voice") or "en-US-AvaMultilingualNeural"
-    ssml = f'<speak version="1.0" xml:lang="en-US"><voice name="{voice}">{escape(text)}</voice></speak>'
+    ssml = f'<speak version="1.0" xml:lang="en-US"><voice name="{voice}"><prosody rate="{escape(rate or "0%")}">{escape(text)}</prosody></voice></speak>'
     audio = http(f"https://{cfg['azure_region']}.tts.speech.microsoft.com/cognitiveservices/v1", "POST",
                  {"Ocp-Apim-Subscription-Key": cfg["azure_key"], "Content-Type": "application/ssml+xml",
                   "X-Microsoft-OutputFormat": "riff-24khz-16bit-mono-pcm", "User-Agent": "lose20"},
@@ -385,7 +385,8 @@ def main():
         open_window(cfg, msg)
     if not a.no_voice and cfg.get("azure_key"):
         try:
-            speak(cfg, msg, (s.get("coach_voice") if state else None))
+            prefs = (state or {}).get("prefs") or {}     # voice picked in the app, synced from phone or PC
+            speak(cfg, msg, prefs.get("voice") or (s.get("coach_voice") if state else None), prefs.get("voiceRate"))
         except Exception as e:
             log(f"voice failed: {e}")
     try:
